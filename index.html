@@ -4,9 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="theme-color" content="#070808">
 <title>IRONLOG</title>
+<meta name="apple-mobile-web-app-title" content="IRONLOG">
+<meta name="mobile-web-app-capable" content="yes">
 
 <!-- Firebase 9 compat -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -40,7 +42,7 @@ input,textarea,select{font-family:inherit;font-size:16px;border-radius:0;-webkit
 ::-webkit-scrollbar-thumb{background:var(--border2);}
 
 /* ── SHELL ────────────────────────────────────────────────────────────── */
-#app{display:flex;flex-direction:column;height:100vh;height:-webkit-fill-available;max-width:480px;margin:0 auto;position:relative;overflow:hidden;padding-top:env(safe-area-inset-top,0px);}
+#app{display:flex;flex-direction:column;height:100vh;height:-webkit-fill-available;max-width:480px;margin:0 auto;position:relative;overflow:hidden;}
 
 /* ── LOADING ─────────────────────────────────────────────────────────── */
 .fullscreen{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--bg);z-index:99;}
