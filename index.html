@@ -50,8 +50,14 @@ input,textarea,select{font-family:inherit;font-size:16px;border-radius:0;-webkit
 .spinner{width:18px;height:18px;border:2px solid var(--border2);border-top-color:var(--acc);border-radius:50%;animation:spin .7s linear infinite;display:inline-block;}
 
 /* ── LOGIN SCREEN ────────────────────────────────────────────────────── */
-.login-screen{padding:calc(var(--top)+40px) 28px calc(var(--bot)+28px);display:flex;flex-direction:column;justify-content:center;min-height:100dvh;}
-.login-logo{font-family:var(--fd);font-size:56px;letter-spacing:6px;color:var(--acc);line-height:1;}
+.login-screen{
+  padding:calc(var(--top)+40px) 32px calc(var(--bot)+32px);
+  display:flex;flex-direction:column;justify-content:center;
+  min-height:100dvh;min-height:-webkit-fill-available;
+  max-width:480px;margin:0 auto;width:100%;
+  overflow-y:auto;-webkit-overflow-scrolling:touch;
+}
+.login-logo{font-family:var(--fd);font-size:clamp(40px,11vw,56px);letter-spacing:clamp(2px,1.5vw,6px);color:var(--acc);line-height:1;}
 .login-logo span{color:var(--mut);}
 .login-tag{font-size:13px;color:var(--sub);margin-top:6px;margin-bottom:56px;font-family:var(--fm);}
 .login-lbl{font-size:10px;color:var(--sub);text-transform:uppercase;letter-spacing:2px;font-family:var(--fm);margin-bottom:16px;}
@@ -590,22 +596,27 @@ async function declineRequest(fromUid){
   });
 }
 
-/* ─── HANDLE REDIRECT RESULT — shows errors in UI, never swallowed ────────── */
+/* ─── HANDLE REDIRECT RESULT ────────────────────────────────────────────── */
+// Check if we're returning from a Google redirect sign-in
+const _redirectPending = sessionStorage.getItem("ironlog-redirect-pending") === "1";
+if(_redirectPending) sessionStorage.removeItem("ironlog-redirect-pending");
+
 if (location.protocol === "https:" || location.protocol === "http:") {
   auth.getRedirectResult().then(result => {
-    // Successful redirect sign-in — onAuthStateChanged handles the rest
-    if (result && result.user) console.log("Redirect sign-in OK:", result.user.email);
+    if(result && result.user){
+      console.log("Redirect sign-in OK:", result.user.email);
+      // onAuthStateChanged will fire and handle the rest
+    }
   }).catch(e => {
-    const ignored = ["auth/no-auth-event", "auth/operation-not-supported-in-this-environment"];
-    if (ignored.includes(e.code)) return;
-    // Show error in UI — never silently ignore
-    if (e.code === "auth/unauthorized-domain") {
+    const ignored = ["auth/no-auth-event","auth/operation-not-supported-in-this-environment","auth/null-user"];
+    if(ignored.includes(e.code)) return;
+    if(e.code === "auth/unauthorized-domain"){
       setState({
-        authReady: true, user: null, loading: false,
-        authError: "Doména <strong>" + location.hostname + "</strong> nie je autorizovaná vo Firebase.<br><br>Otvor Firebase Console → Authentication → Settings → Authorized domains → Add domain → vlož: <code>" + location.hostname + "</code>"
+        authReady:true, user:null, loading:false,
+        authError:"Doména <strong>"+location.hostname+"</strong> nie je autorizovaná vo Firebase.<br><br>Firebase Console → Authentication → Settings → Authorized domains → Add domain → vlož: <code>"+location.hostname+"</code>"
       });
     } else {
-      setState({ authReady: true, user: null, loading: false, authError: e.message });
+      setState({authReady:true, user:null, loading:false, authError:e.message});
     }
   });
 }
@@ -699,6 +710,11 @@ let profileUnsub = null;
 auth.onAuthStateChanged(async user => {
   if(profileUnsub){ profileUnsub(); profileUnsub=null; }
   if(!user){
+    // If redirect is in progress, keep showing loader instead of login screen
+    if(_redirectPending){
+      setState({authReady:true, user:null, profile:null, loading:true});
+      return;
+    }
     setState({authReady:true, user:null, profile:null, loading:false});
     return;
   }
@@ -1510,29 +1526,40 @@ function _updateCmpExList(){
 ══════════════════════════════════════════════════════════════════════════ */
 
 /* Auth */
+const _isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
 async function doSignIn(){
-  // Clear any previous auth errors
   setState({ authError: null });
   const provider = new firebase.auth.GoogleAuthProvider();
-  provider.setCustomParameters({ prompt: "select_account" });
-  try {
-    // Popup: instant, no redirect, works on desktop Chrome/Firefox/Edge
-    await auth.signInWithPopup(provider);
-  } catch(e) {
-    if (e.code === "auth/popup-blocked" || e.code === "auth/cancelled-popup-request") {
-      // Browser blocked popup — fall back to redirect
-      try { await auth.signInWithRedirect(provider); } catch(e2) { _showAuthErr(e2); }
-    } else if (e.code === "auth/unauthorized-domain") {
-      setState({ authError: "Doména <strong>" + location.hostname + "</strong> nie je autorizovaná.<br><br>Firebase Console → Authentication → Settings → Authorized domains → pridaj: <code>" + location.hostname + "</code>" });
-    } else if (e.code !== "auth/popup-closed-by-user") {
-      // User just closed popup — ignore. Anything else — show.
-      _showAuthErr(e);
+  provider.addScope("email");
+  provider.addScope("profile");
+
+  if(_isMobile){
+    // Mobile: always use redirect — popup is unreliable on iOS Safari
+    try {
+      sessionStorage.setItem("ironlog-redirect-pending","1");
+      await auth.signInWithRedirect(provider);
+    } catch(e){ _showAuthErr(e); }
+  } else {
+    // Desktop: popup is instant and reliable
+    try {
+      await auth.signInWithPopup(provider);
+    } catch(e){
+      if(e.code === "auth/popup-blocked" || e.code === "auth/cancelled-popup-request"){
+        try {
+          sessionStorage.setItem("ironlog-redirect-pending","1");
+          await auth.signInWithRedirect(provider);
+        } catch(e2){ _showAuthErr(e2); }
+      } else if(e.code !== "auth/popup-closed-by-user"){
+        _showAuthErr(e);
+      }
     }
   }
 }
 function _showAuthErr(e){
+  sessionStorage.removeItem("ironlog-redirect-pending");
   setState({ authError: e.code === "auth/unauthorized-domain"
-    ? "Doména nie je autorizovaná: " + location.hostname
+    ? "Doména <strong>" + location.hostname + "</strong> nie je autorizovaná.<br><br>Firebase Console → Authentication → Settings → Authorized domains → pridaj: <code>" + location.hostname + "</code>"
     : "Chyba prihlásenia: " + e.message });
 }
 function doSignOut(){ if(confirm("Odhlásiť sa?")){ auth.signOut(); } }
