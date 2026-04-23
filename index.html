@@ -1,0 +1,1794 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#070808">
+<title>IRONLOG</title>
+
+<!-- Firebase 9 compat -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<style>
+/* ── RESET & ROOT ─────────────────────────────────────────────────────── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+:root{
+  --bg:#070808;--s1:#0f1010;--s2:#181919;--s3:#202222;
+  --border:#252727;--border2:#2e3030;
+  --acc:#B8FF00;--acc-bg:rgba(184,255,0,.09);--acc-br:rgba(184,255,0,.25);
+  --red:#FF4444;--red-bg:rgba(255,68,68,.08);
+  --blue:#4FC3F7;--purple:#CE93D8;--orange:#FFB74D;--teal:#4DB6AC;
+  --text:#EBEBEB;--sub:#777;--mut:#3a3a3a;
+  --fd:'Bebas Neue',Impact,sans-serif;
+  --fb:'Barlow',system-ui,sans-serif;
+  --fm:'DM Mono','Courier New',monospace;
+  --nav:56px;
+  --top:env(safe-area-inset-top,0px);
+  --bot:env(safe-area-inset-bottom,0px);
+}
+html{height:-webkit-fill-available;background:var(--bg);}
+body{height:100vh;height:-webkit-fill-available;background:var(--bg);color:var(--text);font-family:var(--fb);overflow:hidden;position:fixed;width:100%;}
+input,textarea,select{font-family:inherit;font-size:16px;border-radius:0;-webkit-appearance:none;appearance:none;}
+::-webkit-scrollbar{width:2px;}
+::-webkit-scrollbar-thumb{background:var(--border2);}
+
+/* ── SHELL ────────────────────────────────────────────────────────────── */
+#app{display:flex;flex-direction:column;height:100vh;height:-webkit-fill-available;max-width:480px;margin:0 auto;position:relative;overflow:hidden;}
+
+/* ── LOADING ─────────────────────────────────────────────────────────── */
+.fullscreen{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--bg);z-index:99;}
+.boot-logo{font-family:var(--fd);font-size:42px;letter-spacing:5px;color:var(--acc);animation:pulse 1.4s ease-in-out infinite;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+@keyframes spin{to{transform:rotate(360deg)}}
+.spinner{width:18px;height:18px;border:2px solid var(--border2);border-top-color:var(--acc);border-radius:50%;animation:spin .7s linear infinite;display:inline-block;}
+
+/* ── LOGIN SCREEN ────────────────────────────────────────────────────── */
+.login-screen{padding:calc(var(--top)+40px) 28px calc(var(--bot)+28px);display:flex;flex-direction:column;justify-content:center;min-height:100dvh;}
+.login-logo{font-family:var(--fd);font-size:56px;letter-spacing:6px;color:var(--acc);line-height:1;}
+.login-logo span{color:var(--mut);}
+.login-tag{font-size:13px;color:var(--sub);margin-top:6px;margin-bottom:56px;font-family:var(--fm);}
+.login-lbl{font-size:10px;color:var(--sub);text-transform:uppercase;letter-spacing:2px;font-family:var(--fm);margin-bottom:16px;}
+.google-btn{display:flex;align-items:center;gap:12px;width:100%;padding:16px 18px;background:var(--s1);border:1px solid var(--border2);color:var(--text);cursor:pointer;font-size:15px;font-weight:600;transition:border-color .15s;}
+.google-btn:active{border-color:var(--acc);}
+.google-icon{width:20px;height:20px;flex-shrink:0;}
+.login-note{font-size:11px;color:var(--mut);margin-top:20px;line-height:1.8;font-family:var(--fm);}
+
+/* ── HEADER ──────────────────────────────────────────────────────────── */
+.hdr{display:flex;align-items:center;justify-content:space-between;padding:calc(var(--top)+12px) 18px 10px;border-bottom:1px solid var(--border);flex-shrink:0;}
+.logo{font-family:var(--fd);font-size:26px;letter-spacing:3px;color:var(--acc);}
+.logo span{color:var(--mut);}
+.hdr-right{display:flex;align-items:center;gap:8px;}
+.avatar{width:32px;height:32px;border-radius:50%;border:1px solid var(--border2);object-fit:cover;}
+.avatar-fallback{width:32px;height:32px;border-radius:50%;background:var(--s2);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--acc);}
+.hdr-btn{background:none;border:none;color:var(--sub);cursor:pointer;font-family:var(--fm);font-size:10px;padding:5px 8px;border:1px solid var(--border);letter-spacing:.5px;}
+.hdr-btn:active{border-color:var(--acc);color:var(--acc);}
+
+/* ── NAV ──────────────────────────────────────────────────────────────── */
+.scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;}
+.nav{flex-shrink:0;display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--border);background:var(--s1);padding-bottom:var(--bot);}
+.nb{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;background:none;border:none;color:var(--mut);font-size:8px;font-weight:600;letter-spacing:1.2px;text-transform:uppercase;cursor:pointer;font-family:var(--fb);padding:8px 0;min-height:var(--nav);}
+.nb svg{width:19px;height:19px;}
+.nb.on{color:var(--acc);}
+.nb-badge{background:var(--red);color:#fff;font-size:8px;width:14px;height:14px;border-radius:50%;display:flex;align-items:center;justify-content:center;position:absolute;top:6px;right:calc(50% - 16px);font-family:var(--fm);}
+
+/* ── WEEK ─────────────────────────────────────────────────────────────── */
+.wk-top{display:flex;align-items:center;justify-content:space-between;padding:14px 18px 10px;}
+.wk-label{font-family:var(--fd);font-size:22px;letter-spacing:1px;}
+.wk-sub{font-size:11px;color:var(--sub);font-family:var(--fm);margin-top:1px;}
+.wk-navs{display:flex;gap:6px;align-items:center;}
+.wk-btn{background:var(--s2);border:1px solid var(--border2);color:var(--text);width:36px;height:36px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:18px;}
+.wk-btn:active{border-color:var(--acc);}
+.today-lbl{font-family:var(--fm);font-size:10px;color:var(--sub);border:1px solid var(--border2);padding:6px 9px;cursor:pointer;background:none;}
+.today-lbl:active{border-color:var(--acc);color:var(--acc);}
+
+.sum-bar{display:flex;border-top:1px solid var(--border);border-bottom:1px solid var(--border);}
+.sum-item{flex:1;padding:10px 0;text-align:center;border-right:1px solid var(--border);}
+.sum-item:last-child{border-right:none;}
+.sum-val{font-family:var(--fm);font-size:18px;color:var(--acc);}
+.sum-key{font-size:9px;color:var(--mut);text-transform:uppercase;letter-spacing:1.5px;margin-top:2px;font-family:var(--fm);}
+
+.day-list{display:flex;flex-direction:column;gap:1px;background:var(--border);}
+.dc{background:var(--s1);padding:14px 18px;display:flex;align-items:center;gap:14px;cursor:pointer;border-left:3px solid transparent;}
+.dc:active{background:var(--s2);}
+.dc.today{border-left-color:var(--acc);}
+.dc.rest{opacity:.4;cursor:default;pointer-events:none;}
+.dc-day{font-family:var(--fd);font-size:36px;line-height:1;width:38px;color:var(--sub);text-align:center;}
+.dc.today .dc-day{color:var(--acc);}
+.dc-info{flex:1;min-width:0;}
+.dc-name{font-weight:600;font-size:14px;}
+.dc-label{font-size:11px;color:var(--sub);text-transform:uppercase;letter-spacing:1px;margin-top:2px;}
+.dc-right{text-align:right;flex-shrink:0;}
+.dc-count{font-family:var(--fm);font-size:12px;color:var(--sub);}
+.dc-count.has{color:var(--acc);}
+.dc-date{font-size:11px;color:var(--mut);margin-top:3px;font-family:var(--fm);}
+
+/* ── DAY SLIDE VIEW ──────────────────────────────────────────────────── */
+.dv{position:absolute;inset:0;background:var(--bg);z-index:20;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .28s cubic-bezier(.4,0,.2,1);pointer-events:none;}
+.dv.open{transform:translateX(0);pointer-events:auto;}
+.dv-hdr{display:flex;align-items:center;gap:10px;padding:calc(var(--top)+10px) 14px 10px;border-bottom:1px solid var(--border);flex-shrink:0;}
+.back{background:none;border:none;color:var(--text);cursor:pointer;width:44px;height:44px;display:flex;align-items:center;justify-content:center;margin-left:-8px;}
+.dv-title{flex:1;min-width:0;}
+.dv-dn{font-family:var(--fd);font-size:24px;letter-spacing:1px;line-height:1;}
+.dv-dl{font-size:10px;text-transform:uppercase;letter-spacing:2px;color:var(--acc);margin-top:3px;}
+.dv-date{font-family:var(--fm);font-size:11px;color:var(--sub);flex-shrink:0;}
+.dv-scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:14px;overscroll-behavior:contain;}
+
+/* ── EXERCISE CARDS ───────────────────────────────────────────────────── */
+.ex-card{background:var(--s1);border:1px solid var(--border);margin-bottom:10px;}
+.ex-hdr{display:flex;align-items:center;padding:11px 14px;gap:8px;border-bottom:1px solid var(--border);}
+.ex-hdr-name{flex:1;font-weight:700;font-size:15px;}
+.ex-del{background:none;border:none;color:var(--sub);cursor:pointer;width:36px;height:36px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.ex-del:active{color:var(--red);}
+.sets-head{display:grid;grid-template-columns:26px 1fr 1fr 38px;background:var(--s2);}
+.sh-cell{padding:6px 8px;font-size:9px;color:var(--mut);font-family:var(--fm);text-transform:uppercase;letter-spacing:1.2px;text-align:center;}
+.set-row{display:grid;grid-template-columns:26px 1fr 1fr 38px;align-items:center;border-top:1px solid var(--s3);}
+.set-num{text-align:center;font-family:var(--fm);font-size:11px;color:var(--sub);}
+.set-cell{padding:4px 6px;}
+.set-inp{width:100%;background:var(--s3);border:1px solid var(--border);color:var(--text);font-family:var(--fm);font-size:16px;font-weight:500;padding:8px 4px;text-align:center;outline:none;transition:border-color .15s;}
+.set-inp:focus{border-color:var(--acc);background:var(--acc-bg);}
+.set-inp::placeholder{color:var(--mut);font-size:12px;}
+.set-del-btn{background:none;border:none;color:var(--sub);cursor:pointer;display:flex;align-items:center;justify-content:center;width:38px;height:100%;padding:8px 0;}
+.set-del-btn:active{color:var(--red);}
+.add-set-btn{display:flex;align-items:center;gap:7px;padding:9px 14px;background:none;border:none;color:var(--sub);cursor:pointer;font-size:12px;font-weight:600;width:100%;border-top:1px solid var(--s3);}
+.add-set-btn:active{background:var(--s2);}
+.add-ex-btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:15px;background:none;border:1px dashed var(--border2);color:var(--sub);cursor:pointer;font-size:13px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;margin-top:4px;}
+.add-ex-btn:active{border-color:var(--acc);color:var(--acc);}
+
+/* ── EXERCISE SEARCH MODAL ────────────────────────────────────────────── */
+.ex-modal{position:absolute;inset:0;z-index:40;background:rgba(0,0,0,.7);display:flex;align-items:flex-end;pointer-events:none;opacity:0;transition:opacity .2s;}
+.ex-modal.open{opacity:1;pointer-events:auto;}
+.ex-modal-inner{background:var(--s1);width:100%;max-height:82vh;display:flex;flex-direction:column;border-top:1px solid var(--border2);transform:translateY(100%);transition:transform .25s cubic-bezier(.4,0,.2,1);}
+.ex-modal.open .ex-modal-inner{transform:translateY(0);}
+.ex-modal-top{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--border);}
+.ex-search-inp{flex:1;background:var(--s2);border:1px solid var(--border2);color:var(--text);padding:10px 14px;font-size:16px;outline:none;}
+.ex-search-inp:focus{border-color:var(--acc);}
+.ex-cancel{background:none;border:none;color:var(--sub);cursor:pointer;font-size:22px;padding:4px 8px;}
+.ex-list{overflow-y:auto;-webkit-overflow-scrolling:touch;flex:1;}
+.ex-cat-label{font-family:var(--fm);font-size:9px;text-transform:uppercase;letter-spacing:2px;color:var(--mut);padding:10px 14px 4px;background:var(--bg);}
+.ex-item{padding:13px 16px;border-bottom:1px solid var(--border);cursor:pointer;font-size:14px;font-weight:500;}
+.ex-item:active{background:var(--s2);color:var(--acc);}
+.ex-item.match{color:var(--text);}
+
+/* ── HINTS ───────────────────────────────────────────────────────────── */
+.hint-bar-lbl{font-size:9px;color:var(--mut);text-transform:uppercase;letter-spacing:1.5px;font-family:var(--fm);padding:8px 14px 0;}
+.last-hint{padding:6px 14px 10px;display:flex;gap:6px;flex-wrap:wrap;}
+.hint-chip{font-family:var(--fm);font-size:11px;color:var(--sub);background:var(--s2);border:1px solid var(--border);padding:4px 9px;cursor:pointer;}
+.hint-chip:active{border-color:var(--acc-br);color:var(--acc);}
+.hint-chip.all{border-color:var(--acc-br);color:var(--acc);}
+.wk-footer{margin-top:16px;padding:12px 14px;background:var(--s1);border:1px solid var(--acc-br);display:flex;justify-content:space-between;align-items:center;}
+.wk-footer-label{font-size:11px;color:var(--sub);text-transform:uppercase;letter-spacing:1.5px;font-family:var(--fm);}
+.wk-footer-val{font-family:var(--fm);color:var(--acc);font-size:12px;}
+
+/* ── HISTORY ──────────────────────────────────────────────────────────── */
+.sec-title{font-family:var(--fd);font-size:22px;letter-spacing:1px;padding:16px 18px 8px;}
+.hi-item{border-bottom:1px solid var(--border);}
+.hi-hdr{display:flex;align-items:center;padding:13px 18px;gap:12px;cursor:pointer;}
+.hi-hdr:active{background:var(--s1);}
+.hi-date{font-family:var(--fm);font-size:12px;color:var(--acc);}
+.hi-dow{font-size:10px;color:var(--mut);font-family:var(--fm);margin-top:2px;}
+.hi-info{flex:1;}
+.hi-label{font-weight:700;font-size:14px;}
+.hi-meta{font-size:11px;color:var(--sub);margin-top:2px;}
+.hi-chev{color:var(--mut);transition:transform .2s;font-size:18px;flex-shrink:0;}
+.hi-body{padding:0 18px 14px;}
+.hi-ex{margin-bottom:8px;}
+.hi-ex-name{font-size:13px;font-weight:600;}
+.hi-sets-txt{font-family:var(--fm);font-size:11px;color:var(--sub);margin-top:3px;line-height:1.9;}
+
+/* ── STATS ────────────────────────────────────────────────────────────── */
+.stat-dual{display:flex;gap:1px;background:var(--border);}
+.stat-half{flex:1;background:var(--s1);padding:14px 18px;}
+.stat-big{font-family:var(--fd);font-size:44px;color:var(--acc);line-height:1;}
+.stat-big-lbl{font-family:var(--fd);font-size:15px;letter-spacing:1px;margin-top:4px;}
+.stat-big-sub{font-size:10px;color:var(--sub);margin-top:2px;}
+.pr-lbl{padding:10px 18px 6px;font-size:10px;color:var(--sub);text-transform:uppercase;letter-spacing:2px;font-family:var(--fm);}
+.stat-card{background:var(--s1);border-bottom:1px solid var(--border);padding:14px 18px;}
+.stat-ex-name{font-weight:700;font-size:14px;margin-bottom:10px;}
+.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
+.stat-box{text-align:center;}
+.stat-val{font-family:var(--fm);font-size:20px;color:var(--acc);}
+.stat-key{font-size:9px;color:var(--mut);text-transform:uppercase;letter-spacing:1px;font-family:var(--fm);margin-top:3px;}
+
+/* ── SETUP ────────────────────────────────────────────────────────────── */
+.setup-wrap{position:fixed;inset:0;overflow-y:auto;-webkit-overflow-scrolling:touch;background:var(--bg);padding:calc(var(--top)+24px) 20px calc(var(--bot)+24px);z-index:50;}
+.setup-inner{max-width:480px;margin:0 auto;}
+.setup-logo{font-family:var(--fd);font-size:44px;letter-spacing:5px;color:var(--acc);}
+.setup-logo span{color:var(--mut);}
+.setup-sub{font-size:13px;color:var(--sub);margin-bottom:24px;margin-top:4px;}
+.setup-lbl{font-size:10px;text-transform:uppercase;letter-spacing:2px;color:var(--sub);margin-bottom:10px;font-family:var(--fm);}
+.split-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:22px;}
+.split-opt{background:var(--s1);border:1px solid var(--border);padding:14px;cursor:pointer;}
+.split-opt:active{background:var(--s2);}
+.split-opt.sel{border-color:var(--acc);background:var(--acc-bg);}
+.so-short{font-family:var(--fd);font-size:30px;color:var(--acc);line-height:1;}
+.so-name{font-size:11px;color:var(--sub);margin-top:3px;}
+.split-opt.sel .so-name{color:var(--text);}
+.preview{display:flex;flex-direction:column;gap:6px;margin-bottom:22px;}
+.prev-row{display:grid;grid-template-columns:40px 1fr;align-items:center;gap:8px;}
+.prev-day{font-family:var(--fm);font-size:11px;color:var(--sub);}
+.prev-val{font-size:13px;font-weight:600;}
+.prev-val.rest{color:var(--mut);}
+.custom-rows{display:flex;flex-direction:column;gap:8px;margin-bottom:22px;}
+.cr{display:flex;align-items:center;gap:10px;}
+.cr-day{font-family:var(--fm);font-size:12px;color:var(--sub);width:26px;flex-shrink:0;}
+.cr-inp{flex:1;background:var(--s2);border:1px solid var(--border);color:var(--text);padding:10px 12px;font-size:16px;outline:none;transition:border-color .15s;}
+.cr-inp:focus{border-color:var(--acc);}
+.start-btn{background:var(--acc);color:var(--bg);padding:16px;font-family:var(--fd);font-size:24px;letter-spacing:3px;border:none;cursor:pointer;width:100%;margin-top:16px;}
+.start-btn:active{opacity:.8;}
+
+/* ── FRIENDS ──────────────────────────────────────────────────────────── */
+.friends-tabs{display:flex;border-bottom:1px solid var(--border);}
+.ftab{flex:1;padding:12px;background:none;border:none;color:var(--sub);font-family:var(--fm);font-size:11px;text-transform:uppercase;letter-spacing:1.5px;cursor:pointer;border-bottom:2px solid transparent;}
+.ftab.on{color:var(--acc);border-bottom-color:var(--acc);}
+
+.friend-search-row{display:flex;gap:8px;padding:14px 18px;border-bottom:1px solid var(--border);}
+.friend-inp{flex:1;background:var(--s2);border:1px solid var(--border2);color:var(--text);padding:10px 14px;font-size:16px;outline:none;}
+.friend-inp:focus{border-color:var(--acc);}
+.send-btn{background:var(--acc);color:var(--bg);border:none;padding:10px 16px;font-family:var(--fd);font-size:18px;letter-spacing:1px;cursor:pointer;flex-shrink:0;}
+.send-btn:active{opacity:.8;}
+.send-btn:disabled{opacity:.3;cursor:default;}
+
+.friend-result{padding:12px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;}
+.fr-avatar{width:38px;height:38px;border-radius:50%;border:1px solid var(--border2);object-fit:cover;flex-shrink:0;}
+.fr-avatar-fb{width:38px;height:38px;border-radius:50%;background:var(--s2);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;color:var(--acc);flex-shrink:0;}
+.fr-info{flex:1;min-width:0;}
+.fr-name{font-weight:700;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.fr-email{font-size:11px;color:var(--sub);font-family:var(--fm);margin-top:2px;}
+.fr-action{background:none;border:1px solid var(--border2);color:var(--sub);padding:7px 12px;cursor:pointer;font-size:12px;font-weight:600;flex-shrink:0;}
+.fr-action.add{border-color:var(--acc-br);color:var(--acc);}
+.fr-action.accept{background:var(--acc);color:var(--bg);border-color:var(--acc);font-family:var(--fd);font-size:15px;letter-spacing:.5px;}
+.fr-action:active{opacity:.7;}
+
+.req-label{padding:10px 18px 6px;font-size:9px;color:var(--sub);text-transform:uppercase;letter-spacing:2px;font-family:var(--fm);}
+.empty{padding:40px 20px;text-align:center;color:var(--mut);font-size:13px;line-height:2;}
+
+/* ── COMPARE ──────────────────────────────────────────────────────────── */
+.cmp-section{padding:14px 18px;border-bottom:1px solid var(--border);}
+.cmp-lbl{font-size:10px;color:var(--sub);text-transform:uppercase;letter-spacing:2px;font-family:var(--fm);margin-bottom:8px;}
+.ex-select-btn{width:100%;padding:11px 14px;background:var(--s2);border:1px solid var(--border2);color:var(--text);text-align:left;font-size:15px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:space-between;}
+.ex-select-btn:active{border-color:var(--acc);}
+.ex-select-btn .placeholder{color:var(--sub);font-weight:400;}
+.friends-toggle-list{display:flex;flex-direction:column;gap:6px;}
+.ftoggle{display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--s2);border:1px solid var(--border);cursor:pointer;}
+.ftoggle.sel{border-color:var(--acc-br);background:var(--acc-bg);}
+.ftoggle-check{width:18px;height:18px;border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.ftoggle.sel .ftoggle-check{background:var(--acc);border-color:var(--acc);color:var(--bg);}
+.cmp-run-btn{width:100%;margin-top:12px;padding:13px;background:var(--acc);color:var(--bg);border:none;font-family:var(--fd);font-size:22px;letter-spacing:2px;cursor:pointer;}
+.cmp-run-btn:active{opacity:.8;}
+.cmp-run-btn:disabled{opacity:.3;cursor:default;}
+
+.chart-wrap{padding:16px 14px 8px;}
+.chart-rule{font-size:10px;color:var(--sub);font-family:var(--fm);text-align:center;margin-top:8px;}
+.chart-loading{padding:40px;text-align:center;color:var(--sub);}
+
+/* ── ADD CUSTOM EXERCISE ─────────────────────────────────────────────── */
+.ex-modal-footer{padding:10px 14px;border-top:1px solid var(--border);background:var(--bg);flex-shrink:0;}
+.add-custom-inp-row{display:flex;gap:8px;align-items:center;}
+.add-custom-inp{flex:1;background:var(--s2);border:1px solid var(--border2);color:var(--text);padding:9px 12px;font-size:16px;outline:none;transition:border-color .15s;}
+.add-custom-inp:focus{border-color:var(--acc);}
+.add-custom-btn{background:var(--acc);color:var(--bg);border:none;padding:9px 14px;font-family:var(--fd);font-size:18px;letter-spacing:1px;cursor:pointer;flex-shrink:0;white-space:nowrap;}
+.add-custom-btn:disabled{opacity:.3;cursor:default;}
+.add-custom-btn:active:not(:disabled){opacity:.8;}
+.custom-msg{font-family:var(--fm);font-size:11px;margin-top:6px;min-height:16px;}
+.custom-msg.ok{color:var(--acc);}
+.custom-msg.err{color:var(--red);}
+.ex-item-community{padding:13px 16px;border-bottom:1px solid var(--border);cursor:pointer;font-size:14px;font-weight:500;display:flex;align-items:center;justify-content:space-between;}
+.ex-item-community:active{background:var(--s2);color:var(--acc);}
+.community-badge{font-family:var(--fm);font-size:9px;color:var(--sub);border:1px solid var(--border);padding:2px 6px;flex-shrink:0;}
+.del-community-btn{background:none;border:none;cursor:pointer;font-size:14px;padding:2px 4px;opacity:.5;flex-shrink:0;line-height:1;}
+.del-community-btn:active{opacity:1;}
+
+/* ── FRIEND DETAIL SLIDE ─────────────────────────────────────────────── */
+.fdv{position:absolute;inset:0;background:var(--bg);z-index:30;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .28s cubic-bezier(.4,0,.2,1);pointer-events:none;}
+.fdv.open{transform:translateX(0);pointer-events:auto;}
+.fdv-hdr{display:flex;align-items:center;gap:12px;padding:calc(var(--top)+10px) 16px 12px;border-bottom:1px solid var(--border);flex-shrink:0;}
+.fdv-scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;}
+.fdv-section{padding:14px 18px;border-bottom:1px solid var(--border);}
+.fdv-sec-lbl{font-size:9px;color:var(--sub);text-transform:uppercase;letter-spacing:2px;font-family:var(--fm);margin-bottom:10px;}
+.fdv-pr-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;}
+.fdv-pr-card{background:var(--s2);padding:10px 12px;}
+.fdv-pr-name{font-size:11px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.fdv-pr-val{font-family:var(--fm);font-size:20px;color:var(--acc);margin-top:3px;}
+.fdv-pr-sub{font-size:9px;color:var(--mut);font-family:var(--fm);}
+.fdv-wk-item{padding:10px 0;border-bottom:1px solid var(--s3);}
+.fdv-wk-item:last-child{border-bottom:none;}
+.fdv-wk-date{font-family:var(--fm);font-size:11px;color:var(--acc);}
+.fdv-wk-exs{font-size:12px;color:var(--sub);margin-top:3px;}
+
+/* ── CMP EXERCISE MODAL (top-level, not inside .dv) ──────────────────── */
+.cmp-ex-overlay{position:absolute;inset:0;z-index:50;background:rgba(0,0,0,.7);display:flex;align-items:flex-end;pointer-events:none;opacity:0;transition:opacity .2s;}
+.cmp-ex-overlay.open{opacity:1;pointer-events:auto;}
+.cmp-ex-overlay .ex-modal-inner{background:var(--s1);width:100%;max-height:82vh;display:flex;flex-direction:column;border-top:1px solid var(--border2);transform:translateY(100%);transition:transform .25s cubic-bezier(.4,0,.2,1);}
+.cmp-ex-overlay.open .ex-modal-inner{transform:translateY(0);}
+
+/* ── PULL TO REFRESH ─────────────────────────────────────────────────── */
+.ptr-indicator{position:absolute;top:0;left:0;right:0;display:flex;align-items:center;justify-content:center;gap:8px;height:52px;background:var(--s1);border-bottom:1px solid var(--border);font-family:var(--fm);font-size:11px;color:var(--sub);transform:translateY(-100%);transition:transform .2s;z-index:10;pointer-events:none;}
+.ptr-indicator.visible{transform:translateY(0);}
+.ptr-indicator.refreshing .spinner{display:inline-block;}
+.ptr-spin{width:16px;height:16px;border:2px solid var(--border2);border-top-color:var(--acc);border-radius:50%;animation:spin .7s linear infinite;}
+
+/* ── MISC ─────────────────────────────────────────────────────────────── */
+.tag{display:inline-block;font-family:var(--fm);font-size:9px;padding:2px 7px;border:1px solid;letter-spacing:.5px;}
+.tag-green{color:var(--acc);border-color:var(--acc-br);}
+.tag-red{color:var(--red);border-color:rgba(255,68,68,.3);}
+.msg{padding:10px 18px;font-size:12px;font-family:var(--fm);}
+.msg-ok{color:var(--acc);}
+.msg-err{color:var(--red);}
+</style>
+</head>
+<body>
+<div id="app"><div class="fullscreen"><div class="boot-logo">IRONLOG</div></div></div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════════════
+   🔧 FIREBASE CONFIG — Replace with your own project config
+   
+   Setup steps:
+   1. Go to console.firebase.google.com
+   2. Create a new project
+   3. Enable Authentication → Sign-in method → Google
+   4. Enable Firestore Database (start in test mode initially)
+   5. Add your domain to Authentication → Authorized domains
+   6. Project Settings → Your apps → Web app → Copy config below
+   7. Paste your Firestore Security Rules (see bottom of file)
+   ═══════════════════════════════════════════════════════════════════════════ */
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyB8GS-GtJ0938ka3a20_ql8ROX2gI4EvEM",
+  authDomain: "ironlog-b9e31.firebaseapp.com",
+  projectId: "ironlog-b9e31",
+  storageBucket: "ironlog-b9e31.firebasestorage.app",
+  messagingSenderId: "141072328102",
+  appId: "1:141072328102:web:3f5f7e5bf133ad56e2db67",
+};
+
+/* ─── ADMIN ───────────────────────────────────────────────────────────────────
+   Tvoj Firebase UID — nájdeš ho v Firebase Console → Authentication → Users
+   alebo sa prihlás do appky a pozri browser console (tam sa loguje uid po prihlásení).
+   Len tento UID uvidí delete tlačidlo pri community cvikoch.
+   ─────────────────────────────────────────────────────────────────────────── */
+const ADMIN_UID = "IwkpZd4FWhf2ID51M8CS3DjXnGi2";   // ← sem vlož svoj UID
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DATABASE STRUCTURE (Firestore):
+
+   users/{uid}
+     displayName: string
+     email:       string
+     photoURL:    string
+     split:       { type: string, days: { mon,tue,...: string } }
+     friends:     string[]           — accepted friend UIDs
+     friendRequests: {               — map: fromUid → request info
+       [fromUid]: { displayName, email, photoURL }
+     }
+
+   users/{uid}/workouts/{YYYY-MM-DD}
+     exercises:  [{ id, name, sets: [{ id, weight, reps }] }]
+     updatedAt:  timestamp
+
+   FIRESTORE SECURITY RULES (paste in Firebase Console → Firestore → Rules):
+   ─────────────────────────────────────────────────────────────
+   rules_version = '2';
+   service cloud.firestore {
+     match /databases/{database}/documents {
+       match /users/{uid} {
+         allow read: if request.auth != null;
+         allow write: if request.auth.uid == uid;
+         match /workouts/{day} {
+           allow read: if request.auth != null;
+           allow write: if request.auth.uid == uid;
+         }
+       }
+       match /exercises/{exId} {
+         allow read: if request.auth != null;
+         allow create: if request.auth != null
+           && request.resource.data.name is string
+           && request.resource.data.name.size() >= 3
+           && request.resource.data.name.size() <= 60
+           && request.resource.data.addedBy == request.auth.uid;
+         allow delete: if request.auth.uid == "REPLACE_WITH_YOUR_UID";
+         allow update: if false;
+       }
+     }
+   }
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ─── EXERCISE LIBRARY ──────────────────────────────────────────────────── */
+const LIBRARY = {
+  "🫁 Hrudník":        ["Bench Press","Incline Bench Press","Decline Bench Press","Dumbbell Press","Incline Dumbbell Press","Chest Fly","Incline Chest Fly","Cable Crossover","Chest Dip","Push-Up","Diamond Push-Up","Pec Deck Machine","Landmine Press","Machine Chest Press","Cable Chest Press"],
+  "🔙 Chrbát":         ["Deadlift","Pull-Up","Chin-Up","Barbell Row","Pendlay Row","Dumbbell Row","Meadows Row","Seated Cable Row","T-Bar Row","Lat Pulldown","Close-Grip Pulldown","Face Pull","Good Morning","Back Extension","Machine Row","Rack Pull","Single-Arm Row","Straight-Arm Pulldown"],
+  "💪 Ramená":         ["Overhead Press","Seated Overhead Press","Arnold Press","Dumbbell Lateral Raise","Cable Lateral Raise","Front Raise","Rear Delt Fly","Reverse Pec Deck","Upright Row","Barbell Shrug","Dumbbell Shrug","Machine Shoulder Press","Behind-the-Neck Press","Cable Face Pull"],
+  "💪 Biceps":         ["Barbell Curl","Dumbbell Curl","Hammer Curl","Preacher Curl","Concentration Curl","Cable Curl","Incline Dumbbell Curl","EZ-Bar Curl","Spider Curl","Reverse Curl","Zottman Curl","Machine Curl","Cross-Body Curl"],
+  "💪 Triceps":        ["Tricep Dip","Skull Crusher","Tricep Pushdown","Rope Pushdown","Overhead Tricep Extension","Close-Grip Bench Press","Tricep Kickback","Cable Overhead Extension","Machine Tricep Extension","JM Press","Tate Press"],
+  "🦵 Nohy":           ["Squat","Front Squat","Hack Squat","Leg Press","Romanian Deadlift","Stiff-Leg Deadlift","Bulgarian Split Squat","Lunge","Walking Lunge","Reverse Lunge","Leg Curl","Seated Leg Curl","Leg Extension","Nordic Curl","Box Jump","Step-Up","Goblet Squat","Sumo Squat","Sissy Squat","Spanish Squat","Single-Leg Press"],
+  "🍑 Gluty":          ["Hip Thrust","Barbell Glute Bridge","Cable Kickback","Sumo Deadlift","Romanian Deadlift","Good Morning","Donkey Kick","Abductor Machine","Adductor Machine","Cable Pull-Through","45° Back Extension"],
+  "🦵 Lýtka":         ["Standing Calf Raise","Seated Calf Raise","Donkey Calf Raise","Single-Leg Calf Raise","Leg Press Calf Raise","Tibialis Raise"],
+  "🔥 Core":           ["Plank","Side Plank","Crunch","Sit-Up","Leg Raise","Hanging Leg Raise","Toes-to-Bar","Russian Twist","Ab Wheel Rollout","Cable Crunch","Dragon Flag","Pallof Press","Woodchop","L-Sit","Hollow Body","Bicycle Crunch","Mountain Climber"],
+  "🏃 Kardio":         ["Running","Cycling","Rowing Machine","Jump Rope","Elliptical","Stair Master","Swimming","Battle Ropes","Sled Push","Sled Pull","Farmer's Walk","Box Jump","Assault Bike"],
+  "🏋️ Celé telo":    ["Clean and Jerk","Snatch","Power Clean","Power Snatch","Clean","Push Press","Push Jerk","Kettlebell Swing","Turkish Get-Up","Thruster","Burpee","Wall Ball"],
+};
+const ALL_EX = Object.entries(LIBRARY).flatMap(([cat,exs])=>exs.map(n=>({cat,n}))).sort((a,b)=>a.n.localeCompare(b.n));
+
+/* ─── CONSTANTS ─────────────────────────────────────────────────────────── */
+const SPLITS = {
+  ppl:    {name:"Push / Pull / Legs",   short:"PPL", days:{mon:"Push",tue:"Pull",wed:"Legs",thu:"Push",fri:"Pull",sat:"Legs",sun:"REST"}},
+  ul:     {name:"Upper / Lower",        short:"U/L",  days:{mon:"Upper",tue:"Lower",wed:"REST",thu:"Upper",fri:"Lower",sat:"REST",sun:"REST"}},
+  bro:    {name:"Bro Split",            short:"BRO",  days:{mon:"Hrudník",tue:"Chrbát",wed:"Ramená",thu:"Ruky",fri:"Nohy",sat:"Cardio",sun:"REST"}},
+  fb:     {name:"Full Body",            short:"FB",   days:{mon:"Full Body",tue:"REST",wed:"Full Body",thu:"REST",fri:"Full Body",sat:"REST",sun:"REST"}},
+  custom: {name:"Vlastný",              short:"OWN",  days:{mon:"",tue:"",wed:"",thu:"",fri:"",sat:"",sun:""}},
+};
+const DAYS  = ["mon","tue","wed","thu","fri","sat","sun"];
+const D_SK  = {mon:"Pondelok",tue:"Utorok",wed:"Streda",thu:"Štvrtok",fri:"Piatok",sat:"Sobota",sun:"Nedeľa"};
+const D_SH  = {mon:"Po",tue:"Ut",wed:"St",thu:"Št",fri:"Pi",sat:"So",sun:"Ne"};
+const MONTHS= ["jan","feb","mar","apr","máj","jún","júl","aug","sep","okt","nov","dec"];
+const FRIEND_COLORS = ["#B8FF00","#4FC3F7","#CE93D8","#FFB74D","#4DB6AC","#F06292"];
+
+/* ─── UTILS ──────────────────────────────────────────────────────────────── */
+const uid   = ()=>Math.random().toString(36).slice(2,9);
+const p2    = n=>String(n).padStart(2,"0");
+const fmtKey= d=>`${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}`;
+const fmtD  = d=>`${d.getDate()}.${d.getMonth()+1}.`;
+const todayKey=()=>fmtKey(new Date());
+const esc   = s=>String(s||"").replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+const initials=name=>(name||"?").split(" ").map(w=>w[0]).join("").toUpperCase().slice(0,2);
+function weekMon(off=0){const d=new Date();d.setHours(0,0,0,0);const dow=d.getDay();d.setDate(d.getDate()-(dow===0?6:dow-1)+off*7);return d;}
+function weekDates(mon){return DAYS.map((_,i)=>{const d=new Date(mon);d.setDate(mon.getDate()+i);return d;});}
+
+/* ─── STATE ──────────────────────────────────────────────────────────────── */
+let S = {
+  // auth
+  authReady: false, user: null, profile: null,
+  // workouts cache
+  workouts: {},        // { dateKey: exercises[] }
+  allLoaded: false,    // history/stats loaded
+  // ui
+  view: "week", weekOff: 0,
+  dayOpen: false, activeDate: null, activeDayKey: null,
+  exModalOpen: false, exQuery: "",
+  // friends
+  friends: [],         // [{uid,displayName,email,photoURL}]
+  friendsTab: "list",  // list | compare
+  friendEmail: "", friendSearch: null, friendMsg: "",
+  // compare
+  cmpEx: "", cmpSelected: [], cmpData: null, cmpLoading: false,
+  cmpExOpen: false,
+  // setup
+  setupType: "ppl", setupCustom: {mon:"",tue:"",wed:"",thu:"",fri:"",sat:"",sun:""},
+  histOpen: {}, loading: true, authError: null,
+  communityExs: [],
+  customExMsg: null,
+  communityLoaded: false,
+  // friend detail view
+  friendDetail: null,       // {uid, displayName, photoURL, workouts, loaded}
+  // pull-to-refresh
+  ptrRefreshing: false,
+};
+
+/* ─── FIREBASE INIT ──────────────────────────────────────────────────────── */
+let db, auth;
+try {
+  firebase.initializeApp(FIREBASE_CONFIG);
+  db   = firebase.firestore();
+  auth = firebase.auth();
+  // LOCAL persistence = user stays logged in across browser sessions / app restarts
+  auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(console.error);
+} catch(e) {
+  console.error("Firebase init failed:", e);
+}
+
+/* ─── RENDER ENGINE ──────────────────────────────────────────────────────── */
+let _raf = null;
+function render(){if(_raf)cancelAnimationFrame(_raf);_raf=requestAnimationFrame(_draw);}
+function renderNow(){_draw();}
+function setState(p){Object.assign(S,typeof p==="function"?p(S):p);render();}
+
+/* ─── FIRESTORE OPS ──────────────────────────────────────────────────────── */
+const userRef = (uid)=>db.collection("users").doc(uid);
+const wkRef   = (uid,dk)=>userRef(uid).collection("workouts").doc(dk);
+
+async function ensureProfile(user) {
+  const snap = await userRef(user.uid).get();
+  if (!snap.exists) {
+    await userRef(user.uid).set({
+      displayName: user.displayName||"Anonym",
+      email: user.email||"",
+      photoURL: user.photoURL||"",
+      split: null,
+      friends: [],
+      friendRequests: {},
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    return (await userRef(user.uid).get()).data();
+  }
+  return snap.data();
+}
+
+async function saveProfile(data){
+  await userRef(S.user.uid).set(data, {merge:true});
+}
+
+async function saveDayWorkout(dateKey, exercises){
+  S.workouts = {...S.workouts, [dateKey]: exercises};
+  await wkRef(S.user.uid, dateKey).set({
+    exercises,
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+  });
+}
+
+function silentSaveDayWorkout(dateKey, exercises){
+  S.workouts = {...S.workouts, [dateKey]: exercises};
+  wkRef(S.user.uid, dateKey).set({
+    exercises,
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+  }).catch(console.error);
+}
+
+async function loadWeekWorkouts(dateKeys){
+  const snaps = await Promise.all(dateKeys.map(k=>wkRef(S.user.uid,k).get()));
+  const res = {};
+  snaps.forEach((s,i)=>{ if(s.exists) res[dateKeys[i]] = s.data().exercises||[]; });
+  return res;
+}
+
+async function loadAllWorkouts(){
+  const snap = await userRef(S.user.uid).collection("workouts").get();
+  const res = {};
+  snap.forEach(doc=>{ res[doc.id] = doc.data().exercises||[]; });
+  return res;
+}
+
+async function loadFriendWorkouts(friendUid){
+  const snap = await userRef(friendUid).collection("workouts").get();
+  const res = {};
+  snap.forEach(doc=>{ res[doc.id] = doc.data().exercises||[]; });
+  return res;
+}
+
+async function loadFriendProfiles(ids){
+  if(!ids||!ids.length) return [];
+  const snaps = await Promise.all(ids.map(id=>userRef(id).get()));
+  return snaps.filter(s=>s.exists).map(s=>({uid:s.id,...s.data()}));
+}
+
+async function searchByEmail(email){
+  const snap = await db.collection("users").where("email","==",email.trim().toLowerCase()).limit(1).get();
+  if(snap.empty) return null;
+  return {uid:snap.docs[0].id,...snap.docs[0].data()};
+}
+
+async function sendFriendRequest(targetUid){
+  await userRef(targetUid).update({
+    [`friendRequests.${S.user.uid}`]: {
+      displayName: S.profile.displayName,
+      email:       S.profile.email,
+      photoURL:    S.profile.photoURL||"",
+    }
+  });
+}
+
+async function acceptRequest(fromUid){
+  const batch = db.batch();
+  batch.update(userRef(S.user.uid), {
+    friends: firebase.firestore.FieldValue.arrayUnion(fromUid),
+    [`friendRequests.${fromUid}`]: firebase.firestore.FieldValue.delete(),
+  });
+  batch.update(userRef(fromUid), {
+    friends: firebase.firestore.FieldValue.arrayUnion(S.user.uid),
+  });
+  await batch.commit();
+}
+
+async function declineRequest(fromUid){
+  await userRef(S.user.uid).update({
+    [`friendRequests.${fromUid}`]: firebase.firestore.FieldValue.delete(),
+  });
+}
+
+/* ─── HANDLE REDIRECT RESULT — shows errors in UI, never swallowed ────────── */
+if (location.protocol === "https:" || location.protocol === "http:") {
+  auth.getRedirectResult().then(result => {
+    // Successful redirect sign-in — onAuthStateChanged handles the rest
+    if (result && result.user) console.log("Redirect sign-in OK:", result.user.email);
+  }).catch(e => {
+    const ignored = ["auth/no-auth-event", "auth/operation-not-supported-in-this-environment"];
+    if (ignored.includes(e.code)) return;
+    // Show error in UI — never silently ignore
+    if (e.code === "auth/unauthorized-domain") {
+      setState({
+        authReady: true, user: null, loading: false,
+        authError: "Doména <strong>" + location.hostname + "</strong> nie je autorizovaná vo Firebase.<br><br>Otvor Firebase Console → Authentication → Settings → Authorized domains → Add domain → vlož: <code>" + location.hostname + "</code>"
+      });
+    } else {
+      setState({ authReady: true, user: null, loading: false, authError: e.message });
+    }
+  });
+}
+
+/* ─── COMMUNITY EXERCISES ───────────────────────────────────────────────── */
+// Banned words filter — checks if name contains any blocked term
+const BANNED = ["nigger","nigga","faggot","retard","chink","spic","kike","cunt","tranny",
+  "negro","wetback","gook","cracker","whore","slut","bitch","fuck","shit","ass","dick",
+  "cock","pussy","bastard","prick","twat","wanker","bollocks","crap","piss","arse"];
+
+function containsBanned(text){
+  const lower = text.toLowerCase().replace(/[^a-z0-9 ]/g,"");
+  return BANNED.some(w => {
+    const re = new RegExp("\\b" + w + "\\b");
+    return re.test(lower);
+  });
+}
+
+function normalizeExName(name){
+  // Capitalize each word, trim, collapse spaces
+  return name.trim().replace(/\s+/g," ")
+    .replace(/\b\w/g, c => c.toUpperCase());
+}
+
+async function deleteCustomExercise(name){
+  if(!confirm(`Vymazať "${name}" z knižnice?`)) return;
+  try {
+    const docId = name.toLowerCase().replace(/[^a-z0-9]/g,"-");
+    await db.collection("exercises").doc(docId).delete();
+    S.communityExs = S.communityExs.filter(n=>n!==name);
+    render();
+    // Update list if modal open
+    setTimeout(()=>{ _updateExList(); _updateCmpExList(); }, 50);
+  } catch(e){
+    alert("Chyba pri mazaní: " + e.message);
+  }
+}
+
+async function loadCommunityExercises(){
+  if(S.communityLoaded) return;
+  try {
+    const snap = await db.collection("exercises").orderBy("name").get();
+    const exs = [];
+    snap.forEach(doc => exs.push(doc.data().name));
+    S.communityExs = exs;
+    S.communityLoaded = true;
+    render();
+  } catch(e){ console.warn("Could not load community exercises:", e); }
+}
+
+async function submitCustomExercise(rawName){
+  const name = normalizeExName(rawName);
+
+  // Validations
+  if(name.length < 3)
+    return setState({customExMsg:{ok:false, text:"Názov musí mať aspoň 3 znaky."}});
+  if(name.length > 60)
+    return setState({customExMsg:{ok:false, text:"Názov je príliš dlhý (max 60 znakov)."}});
+  if(containsBanned(name))
+    return setState({customExMsg:{ok:false, text:"Tento výraz nie je povolený."}});
+
+  // Check duplicate in built-in library
+  const allNames = Object.values(LIBRARY).flat().map(n=>n.toLowerCase());
+  if(allNames.includes(name.toLowerCase()))
+    return setState({customExMsg:{ok:false, text:"Tento cvik už je v knižnici."}});
+
+  // Check duplicate in community
+  if(S.communityExs.map(n=>n.toLowerCase()).includes(name.toLowerCase()))
+    return setState({customExMsg:{ok:false, text:"Tento cvik už niekto pridal."}});
+
+  try {
+    setState({customExMsg:{ok:false, text:"Ukladám..."}});
+    const docId = name.toLowerCase().replace(/[^a-z0-9]/g,"-");
+    await db.collection("exercises").doc(docId).set({
+      name,
+      addedBy: S.user.uid,
+      addedByName: S.profile.displayName,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    S.communityExs = [...S.communityExs, name].sort();
+    setState({customExMsg:{ok:true, text:`"${name}" pridaný do knižnice ✓`}});
+    // Clear message after 3s
+    setTimeout(()=>{ S.customExMsg=null; render(); }, 3000);
+  } catch(e){
+    setState({customExMsg:{ok:false, text:"Chyba: " + e.message}});
+  }
+}
+
+/* ─── AUTH LISTENER ──────────────────────────────────────────────────────── */
+let profileUnsub = null;
+auth.onAuthStateChanged(async user => {
+  if(profileUnsub){ profileUnsub(); profileUnsub=null; }
+  if(!user){
+    setState({authReady:true, user:null, profile:null, loading:false});
+    return;
+  }
+
+  // Show loading spinner while we fetch profile
+  setState({authReady:true, user, loading:true});
+
+  try {
+    // Ensure user profile doc exists in Firestore
+    const profile = await ensureProfile(user);
+
+    // Load friends
+    const friendIds = profile.friends||[];
+    const friends = await loadFriendProfiles(friendIds);
+
+    // Load current week workouts
+    const mon = weekMon(S.weekOff);
+    const dateKeys = weekDates(mon).map(fmtKey);
+    const workouts = await loadWeekWorkouts(dateKeys);
+    Object.assign(S.workouts, workouts);
+
+    setState({ authReady:true, user, profile, friends, loading:false });
+    // Log UID so you can copy it into ADMIN_UID above
+    if(ADMIN_UID === "REPLACE_WITH_YOUR_UID")
+      console.log("%c IRONLOG: Tvoj UID = " + user.uid + "  ← skopíruj do ADMIN_UID v kóde", "background:#B8FF00;color:#000;padding:4px 8px;font-weight:bold");
+
+    // Set up live listener for profile changes (friend requests etc.)
+    profileUnsub = userRef(user.uid).onSnapshot(async snap => {
+      if(!snap.exists) return;
+      const updatedProfile = snap.data();
+      const updatedFriendIds = updatedProfile.friends||[];
+      // Only reload friends if the list changed
+      const prevIds = JSON.stringify(S.profile?.friends||[]);
+      const newIds  = JSON.stringify(updatedFriendIds);
+      const friends = prevIds !== newIds
+        ? await loadFriendProfiles(updatedFriendIds)
+        : S.friends;
+      setState({ profile: updatedProfile, friends });
+    }, err => console.warn("Profile listener error (non-critical):", err));
+
+  } catch(err) {
+    console.error("Auth setup error:", err);
+    // Firestore rules likely not configured — show helpful error
+    const msg = err.code === "permission-denied"
+      ? "Firestore pravidlá nie sú nastavené. Otvor Firebase Console → Firestore → Rules a vlož správne pravidlá (sú v komentári v kóde)."
+      : "Chyba pri načítaní profilu: " + err.message;
+    setState({
+      authReady:true, user, profile:null, loading:false,
+      firestoreError: msg
+    });
+  }
+});
+
+/* ─── WORKOUT HELPERS ────────────────────────────────────────────────────── */
+function getExs(dk){ return S.workouts[dk]||[]; }
+
+function setExs(dk, exs, silent=false){
+  if(silent){ silentSaveDayWorkout(dk, exs); render(); }
+  else { saveDayWorkout(dk, exs).then(render).catch(console.error); }
+}
+
+function silentSet(dk,exId,sid,field,val){
+  const exs=(S.workouts[dk]||[]).map(e=>e.id===exId?{...e,sets:e.sets.map(s=>s.id===sid?{...s,[field]:val}:s)}:e);
+  S.workouts={...S.workouts,[dk]:exs};
+  wkRef(S.user.uid,dk).set({exercises:exs,updatedAt:firebase.firestore.FieldValue.serverTimestamp()}).catch(console.error);
+}
+function silentName(dk,exId,val){
+  const exs=(S.workouts[dk]||[]).map(e=>e.id===exId?{...e,name:val}:e);
+  S.workouts={...S.workouts,[dk]:exs};
+  wkRef(S.user.uid,dk).set({exercises:exs,updatedAt:firebase.firestore.FieldValue.serverTimestamp()}).catch(console.error);
+}
+
+/* ─── COMPARISON LOGIC ───────────────────────────────────────────────────── */
+function maxWeightFor(workouts, exName){
+  let max = 0;
+  Object.values(workouts).forEach(exs=>{
+    (exs||[]).forEach(ex=>{
+      if(ex.name!==exName) return;
+      ex.sets.forEach(s=>{
+        const w=parseFloat(s.weight)||0, r=parseInt(s.reps)||0;
+        if(r>=5 && w>max) max=w;
+      });
+    });
+  });
+  return max;
+}
+
+/* ─── SVG BAR CHART ──────────────────────────────────────────────────────── */
+function buildChart(data){
+  if(!data.length) return "";
+  const maxW = Math.max(...data.map(d=>d.weight), 1);
+  const top  = Math.ceil(maxW/10)*10 + 10;
+  const n = data.length;
+  const W = 660, pad = 48;
+  const chartW = W - pad * 2;
+  // Bar sizing: leave 30% of slot as gap
+  const slot = Math.floor(chartW / n);
+  const barW = Math.min(90, Math.floor(slot * 0.65));
+  const BAR_H = 160; // height of bar area
+  const TOP_PAD = 36; // space above bars for labels
+  const LEGEND_H = n > 2 ? Math.ceil(n/2)*22 + 10 : 0;
+  const H = TOP_PAD + BAR_H + 20 + LEGEND_H; // total svg height
+
+  const bars = data.map((d,i)=>{
+    const x = pad + slot*i + (slot - barW)/2;
+    const barH = Math.max(3, BAR_H * (d.weight / top));
+    const y = TOP_PAD + BAR_H - barH;
+    const label = d.weight > 0 ? d.weight+"kg" : "–";
+    // Name: first name only, max 8 chars
+    const shortName = d.name.length > 8 ? d.name.slice(0,7)+"…" : d.name;
+    return `
+      <rect x="${x}" y="${y}" width="${barW}" height="${barH}" fill="${d.color}" rx="2" opacity="${d.weight>0?'1':'.25'}"/>
+      <text x="${x+barW/2}" y="${y-7}" text-anchor="middle" fill="${d.color}" font-family="'DM Mono',monospace" font-size="11" font-weight="500">${label}</text>
+      <text x="${x+barW/2}" y="${TOP_PAD+BAR_H+14}" text-anchor="middle" fill="#555" font-family="'Barlow',sans-serif" font-size="11" font-weight="600">${esc(shortName)}</text>`;
+  }).join("");
+
+  // Y grid lines (4 lines)
+  const yLines = [0,.33,.66,1].map(r=>{
+    const val = Math.round(top*r);
+    const yy  = TOP_PAD + BAR_H*(1-r);
+    return `<line x1="${pad}" y1="${yy}" x2="${W-pad}" y2="${yy}" stroke="#1e2020" stroke-width="1"/>
+            <text x="${pad-5}" y="${yy+4}" text-anchor="end" fill="#3a3a3a" font-family="'DM Mono',monospace" font-size="10">${val}</text>`;
+  }).join("");
+
+  // Legend (show full names with color dot, 2 columns if > 2 items)
+  let legend = "";
+  if(n > 2){
+    const cols = 2;
+    const lSlotW = Math.floor((W - pad*2) / cols);
+    legend = data.map((d,i)=>{
+      const col = i % cols;
+      const row = Math.floor(i / cols);
+      const lx = pad + col * lSlotW;
+      const ly = TOP_PAD + BAR_H + 28 + row * 22;
+      return `<circle cx="${lx+7}" cy="${ly}" r="5" fill="${d.color}"/>
+              <text x="${lx+17}" y="${ly+4}" fill="#777" font-family="'Barlow',sans-serif" font-size="11" font-weight="500">${esc(d.name)}</text>`;
+    }).join("");
+  }
+
+  return `<svg width="100%" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="overflow:visible">
+    ${yLines}${bars}${legend}
+  </svg>`;
+}
+
+/* ─── ICONS ──────────────────────────────────────────────────────────────── */
+const SVG={
+  calendar:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`,
+  history:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="12 8 12 12 14 14"/><path d="M3.05 11a9 9 0 1 1 .5 4"/><polyline points="3 16 3.05 11 8 11"/></svg>`,
+  trophy:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4a2 2 0 0 1-2-2V5h4"/><path d="M18 9h2a2 2 0 0 0 2-2V5h-4"/><path d="M12 17c-3.3 0-6-2.7-6-6V3h12v8c0 3.3-2.7 6-6 6z"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>`,
+  users:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`,
+  back:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>`,
+  plus:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`,
+  trash:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>`,
+  copy:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`,
+  chev:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg>`,
+  search:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>`,
+  check:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>`,
+};
+function icon(name,size=20){return `<span style="display:inline-flex;width:${size}px;height:${size}px;flex-shrink:0">${SVG[name]||""}</span>`;}
+function googleIcon(){return `<svg class="google-icon" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.29-8.16 2.29-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>`;}
+
+/* ─── AVATAR HTML ────────────────────────────────────────────────────────── */
+function avatarHtml(photoURL, name, size=38){
+  if(photoURL) return `<img src="${esc(photoURL)}" class="fr-avatar" width="${size}" height="${size}" style="width:${size}px;height:${size}px">`;
+  return `<div class="fr-avatar-fb" style="width:${size}px;height:${size}px;font-size:${Math.round(size*0.37)}px">${initials(name)}</div>`;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   RENDER FUNCTIONS
+══════════════════════════════════════════════════════════════════════════ */
+
+function rFirestoreError(){
+  return `<div class="fullscreen" style="padding:28px;align-items:flex-start;justify-content:flex-start;padding-top:56px;overflow-y:auto">
+    <div style="max-width:480px;margin:0 auto;width:100%">
+      <div style="font-family:var(--fd);font-size:32px;letter-spacing:4px;color:var(--acc);margin-bottom:4px">IRONLOG</div>
+      <div style="font-family:var(--fm);font-size:10px;color:var(--red);margin-bottom:20px;text-transform:uppercase;letter-spacing:2px">Firestore Rules chyba</div>
+      <div style="font-size:13px;color:var(--text);line-height:1.8;border:1px solid var(--red);padding:14px;background:var(--red-bg);margin-bottom:16px;font-family:var(--fm)">
+        ${esc(S.firestoreError||"")}
+      </div>
+      <div style="font-family:var(--fm);font-size:12px;color:var(--text);line-height:2.2;border:1px solid var(--border2);padding:16px;background:var(--s1)">
+        <div style="color:var(--acc);font-family:var(--fd);font-size:16px;letter-spacing:1px;margin-bottom:8px">OPRAV PRAVIDLA:</div>
+        <span style="color:var(--acc)">1.</span> Otvor <strong>console.firebase.google.com</strong><br>
+        <span style="color:var(--acc)">2.</span> Projekt ironlog-b9e31 → <strong>Firestore Database</strong><br>
+        <span style="color:var(--acc)">3.</span> Zalozka <strong>Rules</strong><br>
+        <span style="color:var(--acc)">4.</span> Vloz toto a klikni <strong>Publish</strong>:<br>
+        <pre style="background:var(--bg);padding:10px;margin-top:8px;font-size:10px;color:var(--acc);overflow-x:auto;border:1px solid var(--border)">rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{uid} {
+      allow read: if request.auth != null;
+      allow write: if request.auth.uid == uid;
+      match /workouts/{day} {
+        allow read: if request.auth != null;
+        allow write: if request.auth.uid == uid;
+      }
+    }
+  }
+}</pre>
+      </div>
+      <button onclick="auth.signOut()" style="margin-top:16px;background:none;border:1px solid var(--border2);color:var(--sub);padding:10px 18px;cursor:pointer;font-family:var(--fm);font-size:11px;width:100%">
+        ODHLASIŤ SA A SKÚSIŤ ZNOVU
+      </button>
+    </div>
+  </div>`;
+}
+
+function rLogin(errMsg){
+  return `<div class="login-screen">
+    <div class="login-logo">IRON<span>LOG</span></div>
+    <div class="login-tag">// fitness progress tracker</div>
+    ${errMsg ? `<div style="background:rgba(255,68,68,.1);border:1px solid rgba(255,68,68,.3);padding:12px 14px;margin-bottom:16px;font-family:var(--fm);font-size:12px;color:var(--red);line-height:1.8">${errMsg}</div>` : ""}
+    <div class="login-lbl">Prihlás sa a začni trénovať</div>
+    <button class="google-btn" onclick="doSignIn()">
+      ${googleIcon()}
+      Pokračovať cez Google
+    </button>
+    <div class="login-note">Tvoje dáta sú uložené v cloude.<br>Môžeš sa prihlásiť na akomkoľvek zariadení.</div>
+  </div>`;
+}
+
+function rSetup(){
+  const t=S.setupType;
+  const days=t==="custom"?S.setupCustom:SPLITS[t].days;
+  return `<div class="setup-wrap"><div class="setup-inner">
+    <div class="setup-logo">IRON<span>LOG</span></div>
+    <div class="setup-sub">Ahoj, ${S.profile?.displayName?.split(" ")[0]||""}! Nastav si split.</div>
+    <div class="setup-lbl">Typ splitu</div>
+    <div class="split-grid">
+      ${Object.entries(SPLITS).map(([k,s])=>`
+        <div class="split-opt${t===k?" sel":""}" onclick="S.setupType='${k}';render()">
+          <div class="so-short">${s.short}</div><div class="so-name">${s.name}</div>
+        </div>`).join("")}
+    </div>
+    ${t==="custom"?`
+      <div class="setup-lbl">Nastav dni</div>
+      <div class="custom-rows">
+        ${DAYS.map((d,i)=>`<div class="cr">
+          <div class="cr-day">${D_SH[d]}</div>
+          <input class="cr-inp" placeholder="${d==="sun"?"REST":"napr. Push"}"
+            value="${esc(S.setupCustom[d]||"")}"
+            oninput="S.setupCustom['${d}']=this.value"
+            onkeydown="if(event.key==='Enter'){event.preventDefault();var all=document.querySelectorAll('.cr-inp');if(all[${i+1}])all[${i+1}].focus();}">
+        </div>`).join("")}
+      </div>`:`
+      <div class="setup-lbl">Prehľad</div>
+      <div class="preview">
+        ${DAYS.map(d=>`<div class="prev-row">
+          <div class="prev-day">${D_SH[d]}</div>
+          <div class="prev-val${(!days[d]||days[d]==="REST")?" rest":""}">${days[d]||"–"}</div>
+        </div>`).join("")}
+      </div>`}
+    <button class="start-btn" onclick="saveSplit()">ULOŽIŤ SPLIT →</button>
+  </div></div>`;
+}
+
+function rWeek(){
+  const mon=weekMon(S.weekOff), dates=weekDates(mon), today=todayKey();
+  const sd = S.profile.split.days;
+  const wk=dates.map(fmtKey);
+  const wx=wk.flatMap(k=>(S.workouts[k]||[]));
+  const wd=wk.filter(k=>(S.workouts[k]||[]).length>0).length;
+  const ws=wx.reduce((a,e)=>a+e.sets.length,0);
+  const wv=wx.reduce((a,e)=>a+e.sets.reduce((b,s)=>b+(parseFloat(s.weight)||0)*(parseInt(s.reps)||0),0),0);
+  return `
+  <div class="wk-top">
+    <div><div class="wk-label">TÝŽDEŇ</div><div class="wk-sub">${fmtD(dates[0])} – ${fmtD(dates[6])}</div></div>
+    <div class="wk-navs">
+      ${S.weekOff!==0?`<button class="today-lbl" onclick="setState({weekOff:0});reloadWeek()">DNES</button>`:""}
+      <button class="wk-btn" onclick="changeWeek(-1)">‹</button>
+      <button class="wk-btn" onclick="changeWeek(1)">›</button>
+    </div>
+  </div>
+  <div class="sum-bar">
+    <div class="sum-item"><div class="sum-val">${wd}</div><div class="sum-key">tréning</div></div>
+    <div class="sum-item"><div class="sum-val">${ws}</div><div class="sum-key">setov</div></div>
+    <div class="sum-item"><div class="sum-val">${wv>999?(wv/1000).toFixed(1)+"t":Math.round(wv)}</div><div class="sum-key">objem</div></div>
+  </div>
+  <div class="day-list">
+    ${DAYS.map((dk,i)=>{
+      const date=dates[i], dateK=fmtKey(date), isToday=dateK===today;
+      const lbl=sd[dk]||"", isRest=lbl.toUpperCase()==="REST";
+      const exs=S.workouts[dateK]||[], has=exs.length>0;
+      return `<div class="dc${isToday?" today":""}${isRest?" rest":""}" onclick="openDay('${dateK}','${dk}')">
+        <div class="dc-day">${D_SH[dk]}</div>
+        <div class="dc-info"><div class="dc-name">${D_SK[dk]}</div><div class="dc-label">${lbl||"–"}</div></div>
+        <div class="dc-right">
+          <div class="dc-count${has?" has":""}">${isRest?"rest":has?exs.length+" cvikov":isToday?"dnes":"prázdny"}</div>
+          <div class="dc-date">${fmtD(date)}</div>
+        </div>
+      </div>`;
+    }).join("")}
+  </div>`;
+}
+
+function rHistory(){
+  if(!S.allLoaded){ loadAll(); return `<div class="empty"><div class="spinner"></div></div>`; }
+  const entries=Object.entries(S.workouts).filter(([,e])=>(e||[]).length>0).sort(([a],[b])=>b.localeCompare(a));
+  if(!entries.length) return `<div class="empty">Žiadne tréningy.<br>Zaloguj prvý workout! 💪</div>`;
+  const sd=S.profile.split.days;
+  return entries.map(([dk,exs])=>{
+    const d=new Date(dk+"T00:00:00"), dow=DAYS[(d.getDay()+6)%7];
+    const lbl=sd[dow]||"Tréning";
+    const sets=exs.reduce((a,e)=>a+e.sets.length,0);
+    const vol=exs.reduce((a,e)=>a+e.sets.reduce((b,s)=>b+(parseFloat(s.weight)||0)*(parseInt(s.reps)||0),0),0);
+    const open=S.histOpen[dk];
+    return `<div class="hi-item">
+      <div class="hi-hdr" onclick="toggleH('${dk}')">
+        <div><div class="hi-date">${d.getDate()}. ${MONTHS[d.getMonth()]}</div><div class="hi-dow">${D_SK[dow]}</div></div>
+        <div class="hi-info"><div class="hi-label">${lbl}</div><div class="hi-meta">${exs.length} cvikov · ${sets} setov${vol>0?" · "+Math.round(vol).toLocaleString()+" kg":""}</div></div>
+        <div class="hi-chev" style="transform:${open?"rotate(90deg)":"none"}">${icon("chev")}</div>
+      </div>
+      ${open?`<div class="hi-body">${exs.map(ex=>`
+        <div class="hi-ex"><div class="hi-ex-name">${esc(ex.name)}</div>
+        <div class="hi-sets-txt">${ex.sets.map((s,i)=>`${i+1}. ${s.weight||"–"}kg × ${s.reps||"–"}`).join("&emsp;")}</div></div>`).join("")}</div>`:""}
+    </div>`;
+  }).join("");
+}
+
+function rStats(){
+  if(!S.allLoaded){ loadAll(); return `<div class="empty"><div class="spinner"></div></div>`; }
+  const today=new Date(); today.setHours(0,0,0,0);
+  let streak=0;
+  for(let i=0;i<400;i++){const d=new Date(today);d.setDate(today.getDate()-i);if((S.workouts[fmtKey(d)]||[]).length>0)streak++;else if(i>0)break;}
+  const tw=Object.values(S.workouts).filter(e=>(e||[]).length>0).length;
+  const pm={};
+  Object.values(S.workouts).forEach(exs=>(exs||[]).forEach(ex=>{
+    const n=(ex.name||"").trim(); if(!n)return;
+    if(!pm[n])pm[n]={bw:0,br:0,ts:0,tv:0,s:0};
+    const p=pm[n]; p.s++;
+    ex.sets.forEach(s=>{const w=parseFloat(s.weight)||0,r=parseInt(s.reps)||0;if(w>p.bw)p.bw=w;if(r>p.br)p.br=r;p.ts++;p.tv+=w*r;});
+  }));
+  const entries=Object.entries(pm).sort(([,a],[,b])=>b.tv-a.tv);
+  return `
+  <div class="stat-dual" style="margin-bottom:1px">
+    <div class="stat-half"><div class="stat-big">${streak}</div><div class="stat-big-lbl">DNÍ V RADE</div><div class="stat-big-sub">aktívny streak</div></div>
+    <div class="stat-half" style="border-left:1px solid var(--border)"><div class="stat-big">${tw}</div><div class="stat-big-lbl">TRÉNINGOV</div><div class="stat-big-sub">celkovo</div></div>
+  </div>
+  ${entries.length?`<div class="pr-lbl">Osobné rekordy (max váha, min 5 opak.)</div>`:""}
+  ${!entries.length?`<div class="empty">Zaloguj prvý tréning.</div>`:""}
+  ${entries.map(([n,p])=>{
+    const pr5=Object.values(S.workouts).reduce((best,exs)=>{
+      (exs||[]).forEach(ex=>{if(ex.name!==n)return;ex.sets.forEach(s=>{const w=parseFloat(s.weight)||0,r=parseInt(s.reps)||0;if(r>=5&&w>best)best=w;});});return best;},0);
+    return `<div class="stat-card">
+      <div class="stat-ex-name">🔥 ${esc(n)}</div>
+      <div class="stat-grid">
+        <div class="stat-box"><div class="stat-val">${p.bw||"–"}</div><div class="stat-key">Max kg</div></div>
+        <div class="stat-box"><div class="stat-val">${pr5||"–"}</div><div class="stat-key">PR 5+ rep</div></div>
+        <div class="stat-box"><div class="stat-val">${p.s}</div><div class="stat-key">Trén.</div></div>
+        <div class="stat-box"><div class="stat-val">${p.tv>999?(p.tv/1000).toFixed(1)+"t":Math.round(p.tv)}</div><div class="stat-key">Vol kg</div></div>
+      </div>
+    </div>`;
+  }).join("")}`;
+}
+
+function rFriends(){
+  const tab = S.friendsTab;
+  const reqs = S.profile?.friendRequests||{};
+  const reqCount = Object.keys(reqs).length;
+  return `
+  <div class="friends-tabs">
+    <button class="ftab${tab==="list"?" on":""}" onclick="setState({friendsTab:'list'})">
+      PRIATELIA ${reqCount>0?`<span style="color:var(--red);font-size:10px">(${reqCount})</span>`:""}
+    </button>
+    <button class="ftab${tab==="compare"?" on":""}" onclick="setState({friendsTab:'compare'})">POROVNANIE</button>
+  </div>
+  ${tab==="list"?rFriendsList():rCompare()}`;
+}
+
+function rFriendsList(){
+  const reqs = S.profile?.friendRequests||{};
+  const reqEntries = Object.entries(reqs);
+  return `
+  <div class="friend-search-row">
+    <input class="friend-inp" id="friend-email-inp" placeholder="Email priateľa..." type="email"
+      autocomplete="off" autocorrect="off" spellcheck="false"
+      value="${esc(S.friendEmail)}"
+      onkeydown="if(event.key==='Enter')searchFriend()">
+    <button class="send-btn" id="friend-search-btn" onclick="searchFriend()">HĽADAŤ</button>
+  </div>
+  ${S.friendMsg?`<div class="msg ${S.friendMsg.ok?'msg-ok':'msg-err'}">${S.friendMsg.text}</div>`:""}
+  ${S.friendSearch?rFriendResult(S.friendSearch):""}
+
+  ${reqEntries.length?`
+    <div class="req-label">⏳ Žiadosti o priateľstvo</div>
+    ${reqEntries.map(([fromUid,req])=>`
+      <div class="friend-result">
+        ${avatarHtml(req.photoURL,req.displayName)}
+        <div class="fr-info"><div class="fr-name">${esc(req.displayName)}</div><div class="fr-email">${esc(req.email)}</div></div>
+        <button class="fr-action accept" onclick="doAccept('${fromUid}')">PRIJAŤ</button>
+        <button class="fr-action" onclick="doDecline('${fromUid}')" style="margin-left:4px">✕</button>
+      </div>`).join("")}`:""}
+
+  ${S.friends.length?`
+    <div class="req-label" style="margin-top:4px">✅ Priatelia (${S.friends.length})</div>
+    ${S.friends.map(f=>`
+      <div class="friend-result" style="cursor:pointer" onclick="openFriendDetail('${f.uid}')">
+        ${avatarHtml(f.photoURL,f.displayName)}
+        <div class="fr-info"><div class="fr-name">${esc(f.displayName)}</div><div class="fr-email">${esc(f.email)}</div></div>
+        <span style="color:var(--mut);font-size:18px;flex-shrink:0">›</span>
+      </div>`).join("")}`
+  :`<div class="empty">Zatiaľ žiadni priatelia.<br>Pridaj priateľa cez email.</div>`}`;
+}
+
+function rFriendResult(f){
+  const alreadyFriend = (S.profile?.friends||[]).includes(f.uid);
+  const isMe = f.uid === S.user?.uid;
+  const pending = (f.friendRequests||{})[S.user?.uid];
+  return `<div class="friend-result" style="background:var(--s1);border-top:1px solid var(--border)">
+    ${avatarHtml(f.photoURL,f.displayName)}
+    <div class="fr-info"><div class="fr-name">${esc(f.displayName)}</div><div class="fr-email">${esc(f.email)}</div></div>
+    ${isMe?`<span class="tag">SI TO TY</span>`
+    :alreadyFriend?`<span class="tag tag-green">PRIATEĽ</span>`
+    :pending?`<span class="tag" style="color:var(--sub)">ČAKÁ SA</span>`
+    :`<button class="fr-action add" onclick="doSendRequest('${f.uid}')">+ PRIDAŤ</button>`}
+  </div>`;
+}
+
+function rFriendDetail(){
+  const fd = S.friendDetail;
+  if(!fd) return `<div class="fdv"></div>`;
+  const isOpen = !!fd;
+  const f = S.friends.find(fr=>fr.uid===fd.uid)||{};
+
+  // Compute PRs from friend workouts
+  const pm = {};
+  Object.values(fd.workouts||{}).forEach(exs=>(exs||[]).forEach(ex=>{
+    const n=(ex.name||"").trim(); if(!n)return;
+    if(!pm[n])pm[n]={bw:0,s:0};
+    const p=pm[n]; p.s++;
+    ex.sets.forEach(s=>{const w=parseFloat(s.weight)||0,r=parseInt(s.reps)||0;if(r>=5&&w>p.bw)p.bw=w;});
+  }));
+  const prEntries = Object.entries(pm).filter(([,p])=>p.bw>0).sort(([,a],[,b])=>b.bw-a.bw).slice(0,8);
+
+  // Recent workouts
+  const recentWk = Object.entries(fd.workouts||{})
+    .filter(([,e])=>(e||[]).length>0)
+    .sort(([a],[b])=>b.localeCompare(a))
+    .slice(0,5);
+
+  const totalWk = Object.values(fd.workouts||{}).filter(e=>(e||[]).length>0).length;
+
+  return `
+  <div class="fdv${isOpen?" open":""}">
+    <div class="fdv-hdr">
+      <button class="back" onclick="closeFriendDetail()">${icon("back",24)}</button>
+      ${avatarHtml(f.photoURL||"",f.displayName||fd.uid,40)}
+      <div style="flex:1;min-width:0">
+        <div style="font-family:var(--fd);font-size:22px;letter-spacing:1px;line-height:1">${esc(f.displayName||"?")}</div>
+        <div style="font-size:10px;color:var(--sub);font-family:var(--fm);margin-top:3px">${esc(f.email||"")}</div>
+      </div>
+      <div style="text-align:right;flex-shrink:0">
+        <div style="font-family:var(--fm);font-size:18px;color:var(--acc)">${totalWk}</div>
+        <div style="font-size:9px;color:var(--mut);font-family:var(--fm)">tréningov</div>
+      </div>
+    </div>
+    <div class="fdv-scroll">
+      ${!fd.loaded?`<div class="empty"><div class="spinner"></div></div>`:`
+      ${prEntries.length?`
+        <div class="fdv-section">
+          <div class="fdv-sec-lbl">🔥 Rekordy (min. 5 opakovaní)</div>
+          <div class="fdv-pr-grid">
+            ${prEntries.map(([n,p])=>`
+              <div class="fdv-pr-card">
+                <div class="fdv-pr-name" title="${esc(n)}">${esc(n)}</div>
+                <div class="fdv-pr-val">${p.bw}kg</div>
+                <div class="fdv-pr-sub">${p.s} trén.</div>
+              </div>`).join("")}
+          </div>
+        </div>`:""}
+      ${recentWk.length?`
+        <div class="fdv-section">
+          <div class="fdv-sec-lbl">Posledné tréningy</div>
+          ${recentWk.map(([dk,exs])=>{
+            const d=new Date(dk+"T00:00:00");
+            return `<div class="fdv-wk-item">
+              <div class="fdv-wk-date">${d.getDate()}. ${MONTHS[d.getMonth()]} ${d.getFullYear()}</div>
+              <div class="fdv-wk-exs">${exs.map(e=>esc(e.name)).join(", ")}</div>
+            </div>`;
+          }).join("")}
+        </div>`:""}
+      ${!prEntries.length&&!recentWk.length?`<div class="empty">Žiadne tréningy.</div>`:""}
+      `}
+    </div>
+  </div>`;
+}
+
+function rCompare(){
+  const myExs = new Set(Object.values(S.workouts).flatMap(exs=>(exs||[]).map(e=>e.name)));
+  const allExNames = [...myExs].sort();
+  if(!S.friends.length) return `<div class="empty">Najprv si pridaj priateľov<br>v záložke Priatelia.</div>`;
+  return `
+  <div class="cmp-section">
+    <div class="cmp-lbl">Vyber cvik</div>
+    <button class="ex-select-btn" onclick="setState({cmpExOpen:true,exQuery:''});loadCommunityExercises()">
+      ${S.cmpEx?`<span>${esc(S.cmpEx)}</span>`:`<span class="placeholder">Vyber cvik z knižnice...</span>`}
+      <span style="color:var(--sub);font-size:18px">▾</span>
+    </button>
+  </div>
+  <div class="cmp-section">
+    <div class="cmp-lbl">Porovnať s (${S.cmpSelected.length} vybraných)</div>
+    <div class="friends-toggle-list">
+      ${S.friends.map((f,i)=>{
+        const sel=S.cmpSelected.includes(f.uid);
+        return `<div class="ftoggle${sel?" sel":""}" onclick="toggleCmp('${f.uid}')">
+          <div class="ftoggle-check">${sel?icon("check",12):""}</div>
+          ${avatarHtml(f.photoURL,f.displayName,28)}
+          <span style="font-size:14px;font-weight:600">${esc(f.displayName)}</span>
+        </div>`;
+      }).join("")}
+    </div>
+    <button class="cmp-run-btn" onclick="runCompare()"
+      ${!S.cmpEx||!S.cmpSelected.length?"disabled":""}>
+      POROVNAŤ
+    </button>
+  </div>
+  ${S.cmpLoading?`<div class="chart-loading"><div class="spinner"></div></div>`:""}
+  ${S.cmpData&&!S.cmpLoading?`
+    <div class="chart-wrap">
+      <div style="font-family:var(--fd);font-size:16px;letter-spacing:1px;margin-bottom:12px;color:var(--sub)">${esc(S.cmpData.exercise)}</div>
+      ${buildChart(S.cmpData.bars)}
+      <div class="chart-rule">⚡ Platia len sety s min. 5 opakovaniami</div>
+    </div>`:""}`;
+}
+
+function rDayView(){
+  const {activeDate:dk,activeDayKey:day,dayOpen,exModalOpen,exQuery}=S;
+  if(!dk) return `<div class="dv"></div>`;
+  const label=S.profile.split.days[day]||"";
+  const exs=getExs(dk);
+  const d=new Date(dk+"T00:00:00");
+  let lastData=null;
+  const wk=Object.keys(S.workouts).filter(k=>{
+    if(k===dk)return false;
+    const wd=new Date(k+"T00:00:00");
+    return DAYS[(wd.getDay()+6)%7]===day&&(S.workouts[k]||[]).length>0;
+  }).sort().reverse();
+  if(wk.length)lastData={date:wk[0],exs:S.workouts[wk[0]]};
+  const ts=exs.reduce((a,e)=>a+e.sets.length,0);
+  const tv=exs.reduce((a,e)=>a+e.sets.reduce((b,s)=>b+(parseFloat(s.weight)||0)*(parseInt(s.reps)||0),0),0);
+
+  // Use shared _filterExs so community + delete button work in initial render too
+  const {filtered: filteredExs, grouped, communityFiltered} = _filterExs();
+
+  return `
+  <div class="dv${dayOpen?" open":""}">
+    <div class="dv-hdr">
+      <button class="back" onclick="closeDay()">${icon("back",24)}</button>
+      <div class="dv-title">
+        <div class="dv-dn">${D_SK[day]||""}</div>
+        ${label&&label!=="REST"?`<div class="dv-dl">${label}</div>`:""}
+      </div>
+      <div class="dv-date">${fmtD(d)}</div>
+    </div>
+
+    ${lastData&&exs.length===0?`
+    <div style="border-bottom:1px solid var(--border)">
+      <div class="hint-bar-lbl">Minulý tréning · ${lastData.date}</div>
+      <div class="last-hint">
+        ${lastData.exs.map(e=>`<div class="hint-chip" onclick='addFromHint(${JSON.stringify(JSON.stringify(e))})'>${icon("plus",10)} ${esc(e.name)}</div>`).join("")}
+        <div class="hint-chip all" onclick='copyAll(${JSON.stringify(JSON.stringify(lastData.exs))})'>${icon("copy",11)} Kopírovať všetko</div>
+      </div>
+    </div>`:""}
+
+    <div class="dv-scroll">
+      ${exs.length===0?`<div class="empty">Žiadne cviky.<br>Tap "Pridaj cvik" a vyber z knižnice.</div>`:""}
+      ${exs.map(ex=>`
+        <div class="ex-card">
+          <div class="ex-hdr">
+            <div class="ex-hdr-name">${esc(ex.name)}</div>
+            <button class="ex-del" onclick="delEx('${dk}','${ex.id}')">${icon("trash",15)}</button>
+          </div>
+          <div class="sets-head">
+            <div class="sh-cell">#</div><div class="sh-cell">Váha kg</div><div class="sh-cell">Opak.</div><div></div>
+          </div>
+          ${ex.sets.map((s,si)=>`
+            <div class="set-row">
+              <div class="set-num">${si+1}</div>
+              <div class="set-cell">
+                <input class="set-inp" type="text" inputmode="decimal" placeholder="0" value="${esc(s.weight)}"
+                  oninput="silentSet('${dk}','${ex.id}','${s.id}','weight',this.value)">
+              </div>
+              <div class="set-cell">
+                <input class="set-inp" type="text" inputmode="numeric" placeholder="0" value="${esc(s.reps)}"
+                  oninput="silentSet('${dk}','${ex.id}','${s.id}','reps',this.value)">
+              </div>
+              <button class="set-del-btn" onclick="delSet('${dk}','${ex.id}','${s.id}')">${icon("trash",13)}</button>
+            </div>`).join("")}
+          <button class="add-set-btn" onclick="addSet('${dk}','${ex.id}')">${icon("plus",13)} Pridaj set</button>
+        </div>`).join("")}
+      <button class="add-ex-btn" onclick="openExModal()">${icon("search",16)} Pridaj cvik</button>
+      ${ts>0?`<div class="wk-footer">
+        <div class="wk-footer-label">Celkovo</div>
+        <div class="wk-footer-val">${exs.length}x · ${ts} setov${tv>0?" · "+Math.round(tv).toLocaleString()+" kg vol":""}</div>
+      </div>`:""}
+      <div style="height:28px"></div>
+    </div>
+
+    <!-- Exercise Search Modal -->
+    <div class="ex-modal${exModalOpen?" open":""}" onclick="if(event.target===this)closeExModal()">
+      <div class="ex-modal-inner">
+        <div class="ex-modal-top">
+          <input class="ex-search-inp" id="ex-search-inp" placeholder="Hľadaj cvik..." autocomplete="off"
+            value="${esc(exQuery)}" autocorrect="off" autocapitalize="off" spellcheck="false">
+          <button class="ex-cancel" onclick="closeExModal()">✕</button>
+        </div>
+        <div class="ex-list" id="ex-list">
+          ${_buildListHTML(grouped, communityFiltered, "exname")}
+        </div>
+        <div class="ex-modal-footer">
+          <div class="add-custom-inp-row">
+            <input class="add-custom-inp" id="custom-ex-inp"
+              placeholder="Pridať vlastný cvik do knižnice..."
+              autocorrect="off" autocapitalize="words" spellcheck="false"
+              onkeydown="if(event.key==='Enter'){event.preventDefault();_submitCustomEx();}">
+            <button class="add-custom-btn" id="custom-ex-btn" onclick="_submitCustomEx()">+ PRIDAŤ</button>
+          </div>
+          ${S.customExMsg?`<div class="custom-msg ${S.customExMsg.ok?'ok':'err'}">${esc(S.customExMsg.text)}</div>`:`<div class="custom-msg" style="color:var(--mut)">Cviky vidia všetci používatelia · nevhodný obsah bude zamietnutý</div>`}
+        </div>
+      </div>
+    </div>
+
+  </div>`;
+}
+
+/* ─── Compare exercise modal — rendered at app root, not inside .dv ─────── */
+function rCmpExModal(){
+  const {cmpExOpen, exQuery} = S;
+  const {filtered: filteredExs, grouped, communityFiltered} = _filterExs();
+  return `
+  <div class="cmp-ex-overlay${cmpExOpen?" open":""}" id="cmp-ex-overlay" onclick="if(event.target===this)closeCmpExModal()">
+    <div class="ex-modal-inner">
+      <div class="ex-modal-top">
+        <input class="ex-search-inp" id="cmp-search-inp" placeholder="Hľadaj cvik..."
+          autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+          value="${esc(exQuery)}">
+        <button class="ex-cancel" onclick="closeCmpExModal()">✕</button>
+      </div>
+      <div class="ex-list" id="cmp-ex-list">
+        ${_buildListHTML(grouped, communityFiltered, "cmpname")}
+      </div>
+    </div>
+  </div>`;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MASTER DRAW
+═══════════════════════════════════════════════════════════════════════════ */
+function _draw(){
+  const app=document.getElementById("app");
+  if(!S.authReady){ app.innerHTML=`<div class="fullscreen"><div class="boot-logo">IRONLOG</div></div>`; return; }
+  // Auth error (unauthorized domain, etc) — show in login screen, not alert
+  if(!S.user){ app.innerHTML=rLogin(S.authError); return; }
+
+  // Firestore rules error — show fix instructions
+  if(S.firestoreError){ app.innerHTML=rFirestoreError(); return; }
+
+  // Still loading profile
+  if(S.loading || !S.profile){ app.innerHTML=`<div class="fullscreen"><div class="boot-logo" style="font-size:28px;letter-spacing:3px">NAČÍTAVAM...</div></div>`; return; }
+
+  if(!S.profile?.split){ app.innerHTML=rSetup(); return; }
+
+  const reqCount = Object.keys(S.profile?.friendRequests||{}).length;
+  const navI=[
+    {k:"week",l:"TÝŽDEŇ",i:"calendar"},
+    {k:"history",l:"HISTÓRIA",i:"history"},
+    {k:"stats",l:"ŠTATISTIKY",i:"trophy"},
+    {k:"friends",l:"PRIATELIA",i:"users",badge:reqCount},
+  ];
+
+  let body="";
+  if(S.view==="week")    body=rWeek();
+  if(S.view==="history") body=`<div class="sec-title">HISTÓRIA</div>${rHistory()}`;
+  if(S.view==="stats")   body=`<div class="sec-title">ŠTATISTIKY</div>${rStats()}`;
+  if(S.view==="friends") body=rFriends();
+
+  const userPhoto = S.user.photoURL
+    ? `<img src="${esc(S.user.photoURL)}" class="avatar" onclick="doSignOut()" title="Odhlásiť sa">`
+    : `<div class="avatar-fallback" onclick="doSignOut()" title="Odhlásiť sa">${initials(S.user.displayName)}</div>`;
+
+  app.innerHTML=`
+    <div class="hdr">
+      <div class="logo">IRON<span>LOG</span></div>
+      <div class="hdr-right">
+        <button class="hdr-btn" onclick="setState({view:'week'});setTimeout(()=>{setState({view:'setup'})},0)"
+          style="display:none"></button>
+        ${userPhoto}
+      </div>
+    </div>
+    <div class="scroll" id="main-scroll">${body}</div>
+    <nav class="nav">
+      ${navI.map(n=>`<button class="nb${S.view===n.k?" on":""}" style="position:relative" onclick="switchView('${n.k}')">
+        ${icon(n.i,19)}
+        <span>${n.l}</span>
+        ${n.badge?`<div class="nb-badge">${n.badge}</div>`:""}
+      </button>`).join("")}
+    </nav>
+    ${rDayView()}
+    ${rCmpExModal()}
+    ${rFriendDetail()}
+    <div class="ptr-indicator" id="ptr-indicator">
+      <div class="ptr-spin"></div>
+      <span id="ptr-text">Načítavam...</span>
+    </div>`;
+
+  // Attach ALL input listeners after render
+  _attachSearchListeners();
+  _attachFriendInputListener();
+  _initPullToRefresh();
+}
+
+function _attachSearchListeners(){
+  _attachInputListener("ex-search-inp",  _updateExList);
+  _attachInputListener("cmp-search-inp", _updateCmpExList);
+  _attachListDelegate("ex-list",     "[data-exname]",  item=>pickEx(S.activeDate, item.dataset.exname));
+  _attachListDelegate("cmp-ex-list", "[data-cmpname]", item=>pickCmpEx(item.dataset.cmpname));
+  if(S.exModalOpen){ const el=document.getElementById("ex-search-inp");  if(el) setTimeout(()=>el.focus(),60); }
+  if(S.cmpExOpen){   const el=document.getElementById("cmp-search-inp"); if(el) setTimeout(()=>el.focus(),60); }
+}
+
+/* ─── FIX 3: Friend email input listener — no re-render on keystroke ──────── */
+function _attachFriendInputListener(){
+  const inp = document.getElementById("friend-email-inp");
+  if(!inp || inp._hasInputListener) return;
+  inp._hasInputListener = true;
+  inp.addEventListener("input", function(){
+    S.friendEmail = this.value;
+    S.friendSearch = null;
+    S.friendMsg = "";
+    // Update search button disabled state without full re-render
+    const btn = document.getElementById("friend-search-btn");
+    if(btn) btn.disabled = !this.value.trim();
+  });
+}
+
+function _attachInputListener(id, updateFn){
+  const el = document.getElementById(id);
+  if(!el || el._hasInputListener) return;
+  el._hasInputListener = true;
+  el.addEventListener("input", function(){
+    S.exQuery = this.value;
+    updateFn();
+    // NO re-attaching delegation here — container element persists, listeners stay
+  });
+}
+
+function _attachListDelegate(id, selector, handler){
+  const el = document.getElementById(id);
+  if(!el || el._delegated) return;
+  el._delegated = true;
+  el.addEventListener("click", function(e){
+    // Delete button — handle separately, don't trigger item pick
+    const delBtn = e.target.closest(".del-community-btn");
+    if(delBtn){ e.stopPropagation(); deleteCustomExercise(delBtn.dataset.delname); return; }
+    const item = e.target.closest(selector);
+    if(item) handler(item);
+  });
+}
+
+function _filterExs(){
+  const q = (S.exQuery||"").toLowerCase().trim();
+  // Built-in exercises
+  const filtered = q ? ALL_EX.filter(e=>e.n.toLowerCase().includes(q)) : ALL_EX;
+  const grouped = {};
+  filtered.forEach(e=>{ if(!grouped[e.cat]) grouped[e.cat]=[]; grouped[e.cat].push(e.n); });
+  // Community exercises — separate category
+  const builtinNames = new Set(ALL_EX.map(e=>e.n.toLowerCase()));
+  const communityFiltered = (S.communityExs||[]).filter(n=>
+    !builtinNames.has(n.toLowerCase()) && (!q || n.toLowerCase().includes(q))
+  );
+  return { filtered, grouped, communityFiltered };
+}
+
+function _buildListHTML(grouped, communityFiltered, nameAttr){
+  const isAdmin = S.user && (S.user.uid === ADMIN_UID);
+  let html = Object.entries(grouped).map(([cat,names])=>
+    `<div class="ex-cat-label">${cat}</div>` +
+    names.map(n=>`<div class="ex-item match" data-${nameAttr}="${esc(n)}">${esc(n)}</div>`).join("")
+  ).join("");
+  if(communityFiltered.length){
+    html += `<div class="ex-cat-label">👥 Komunita</div>` +
+      communityFiltered.map(n=>`
+        <div class="ex-item-community" data-${nameAttr}="${esc(n)}">
+          <span>${esc(n)}</span>
+          <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+            <span class="community-badge">vlastný</span>
+            ${isAdmin ? `<button class="del-community-btn" data-delname="${esc(n)}" title="Vymazať cvik">🗑</button>` : ""}
+          </div>
+        </div>`).join("");
+  }
+  return html || `<div class="empty">Nič sa nenašlo.</div>`;
+}
+
+function _updateExList(){
+  const exList = document.getElementById("ex-list");
+  if(!exList) return;
+  const {filtered, grouped, communityFiltered} = _filterExs();
+  exList.innerHTML = _buildListHTML(grouped, communityFiltered, "exname");
+}
+
+function _updateCmpExList(){
+  const cmpList = document.getElementById("cmp-ex-list");
+  if(!cmpList) return;
+  const {filtered, grouped, communityFiltered} = _filterExs();
+  cmpList.innerHTML = _buildListHTML(grouped, communityFiltered, "cmpname");
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   ACTIONS
+══════════════════════════════════════════════════════════════════════════ */
+
+/* Auth */
+async function doSignIn(){
+  // Clear any previous auth errors
+  setState({ authError: null });
+  const provider = new firebase.auth.GoogleAuthProvider();
+  provider.setCustomParameters({ prompt: "select_account" });
+  try {
+    // Popup: instant, no redirect, works on desktop Chrome/Firefox/Edge
+    await auth.signInWithPopup(provider);
+  } catch(e) {
+    if (e.code === "auth/popup-blocked" || e.code === "auth/cancelled-popup-request") {
+      // Browser blocked popup — fall back to redirect
+      try { await auth.signInWithRedirect(provider); } catch(e2) { _showAuthErr(e2); }
+    } else if (e.code === "auth/unauthorized-domain") {
+      setState({ authError: "Doména <strong>" + location.hostname + "</strong> nie je autorizovaná.<br><br>Firebase Console → Authentication → Settings → Authorized domains → pridaj: <code>" + location.hostname + "</code>" });
+    } else if (e.code !== "auth/popup-closed-by-user") {
+      // User just closed popup — ignore. Anything else — show.
+      _showAuthErr(e);
+    }
+  }
+}
+function _showAuthErr(e){
+  setState({ authError: e.code === "auth/unauthorized-domain"
+    ? "Doména nie je autorizovaná: " + location.hostname
+    : "Chyba prihlásenia: " + e.message });
+}
+function doSignOut(){ if(confirm("Odhlásiť sa?")){ auth.signOut(); } }
+
+/* Split */
+async function saveSplit(){
+  const t=S.setupType;
+  const days=t==="custom"?{...S.setupCustom}:{...SPLITS[t].days};
+  await saveProfile({split:{type:t,days}});
+}
+
+/* Week navigation */
+async function changeWeek(dir){
+  setState({weekOff:S.weekOff+dir});
+  await reloadWeek();
+}
+async function reloadWeek(){
+  const mon=weekMon(S.weekOff), dateKeys=weekDates(mon).map(fmtKey);
+  const wk=await loadWeekWorkouts(dateKeys);
+  Object.assign(S.workouts,wk);
+  render();
+}
+
+/* Day */
+function openDay(dk,day){ Object.assign(S,{activeDate:dk,activeDayKey:day,dayOpen:true,exModalOpen:false,exQuery:""}); render(); }
+function closeDay(){ S.dayOpen=false; render(); }
+function toggleH(dk){ S.histOpen={...S.histOpen,[dk]:!S.histOpen[dk]}; render(); }
+function switchView(v){
+  S.view=v;
+  if((v==="history"||v==="stats")&&!S.allLoaded) loadAll();
+  render();
+}
+
+/* Exercise modal */
+function _submitCustomEx(){
+  const inp = document.getElementById("custom-ex-inp");
+  if(!inp) return;
+  const val = inp.value.trim();
+  if(!val) return;
+  inp.value = "";
+  submitCustomExercise(val);
+}
+
+function openExModal(){
+  Object.assign(S,{exModalOpen:true,exQuery:"",customExMsg:null});
+  render();
+  loadCommunityExercises(); // lazy load community exercises
+}
+function closeExModal(){ S.exModalOpen=false; render(); }
+function closeCmpExModal(){ S.cmpExOpen=false; render(); }
+
+function pickEx(dk, name){
+  const exs=getExs(dk);
+  const newEx={id:uid(),name,sets:[{id:uid(),weight:"",reps:""}]};
+  setExs(dk,[...exs,newEx],true);
+  S.exModalOpen=false;
+  render();
+}
+function pickCmpEx(name){ Object.assign(S,{cmpEx:name,cmpExOpen:false,exQuery:"",cmpData:null}); render(); }
+
+/* Workout editing */
+function delEx(dk,id){ setExs(dk,getExs(dk).filter(e=>e.id!==id),true); }
+function addSet(dk,exId){ setExs(dk,getExs(dk).map(e=>e.id===exId?{...e,sets:[...e.sets,{id:uid(),weight:"",reps:""}]}:e),true); }
+function delSet(dk,exId,sid){ setExs(dk,getExs(dk).map(e=>e.id===exId?{...e,sets:e.sets.filter(s=>s.id!==sid)}:e),true); }
+function addFromHint(j){ const e=JSON.parse(j); setExs(S.activeDate,[...getExs(S.activeDate),{...e,id:uid(),sets:e.sets.map(s=>({...s,id:uid()}))}],true); }
+function copyAll(j){ setExs(S.activeDate,JSON.parse(j).map(e=>({...e,id:uid(),sets:e.sets.map(s=>({...s,id:uid()}))})),true); }
+
+/* History / Stats lazy load */
+async function loadAll(){
+  if(S.allLoaded) return;
+  const all = await loadAllWorkouts();
+  Object.assign(S.workouts, all);
+  S.allLoaded = true;
+  render();
+}
+
+/* Friends */
+async function searchFriend(){
+  const email = S.friendEmail.trim().toLowerCase();
+  if(!email){ setState({friendMsg:{ok:false,text:"Zadaj email."}}); return; }
+  setState({friendMsg:{ok:false,text:"Hľadám..."}, friendSearch:null});
+  try {
+    const result = await searchByEmail(email);
+    if(!result){ setState({friendMsg:{ok:false,text:"Používateľ nenájdený."}}); return; }
+    setState({friendSearch:result, friendMsg:""});
+  } catch(e){ setState({friendMsg:{ok:false,text:"Chyba: "+e.message}}); }
+}
+
+async function doSendRequest(targetUid){
+  try {
+    await sendFriendRequest(targetUid);
+    setState({friendMsg:{ok:true,text:"Žiadosť odoslaná! ✓"}, friendSearch:null, friendEmail:""});
+  } catch(e){ setState({friendMsg:{ok:false,text:"Chyba: "+e.message}}); }
+}
+
+async function doAccept(fromUid){
+  await acceptRequest(fromUid);
+}
+async function doDecline(fromUid){
+  await declineRequest(fromUid);
+}
+
+/* Compare */
+function toggleCmp(fuid){
+  const sel = S.cmpSelected.includes(fuid)
+    ? S.cmpSelected.filter(u=>u!==fuid)
+    : [...S.cmpSelected, fuid];
+  S.cmpSelected = sel;
+  S.cmpData = null;
+  render();
+}
+
+async function runCompare(){
+  if(!S.cmpEx||!S.cmpSelected.length) return;
+  setState({cmpLoading:true, cmpData:null});
+  try {
+    // Always load all own workouts for comparison accuracy
+    if(!S.allLoaded){ await loadAll(); }
+
+    const myMax = maxWeightFor(S.workouts, S.cmpEx);
+    const myName = (S.profile.displayName||"Ja").split(" ")[0];
+    const bars = [{ name: myName, weight: myMax, color: FRIEND_COLORS[0] }];
+
+    for(let i=0;i<S.cmpSelected.length;i++){
+      const fUid = S.cmpSelected[i];
+      const f = S.friends.find(fr=>fr.uid===fUid);
+      const fname = (f?.displayName||"?").split(" ")[0];
+      const fWorkouts = await loadFriendWorkouts(fUid);
+      const fMax = maxWeightFor(fWorkouts, S.cmpEx);
+      // Use distinct colors — cycle through FRIEND_COLORS skipping index 0 (mine)
+      const colorIdx = (i+1) % FRIEND_COLORS.length;
+      bars.push({ name: fname, weight: fMax, color: FRIEND_COLORS[colorIdx] });
+    }
+    setState({cmpData:{exercise:S.cmpEx, bars}, cmpLoading:false});
+  } catch(e){
+    console.error("runCompare error:", e);
+    setState({cmpLoading:false});
+  }
+}
+
+/* ─── FRIEND DETAIL ACTIONS ─────────────────────────────────────────────── */
+async function openFriendDetail(fUid){
+  // Set state with empty workouts first, show spinner
+  setState({ friendDetail: { uid: fUid, workouts: {}, loaded: false } });
+  try {
+    const workouts = await loadFriendWorkouts(fUid);
+    S.friendDetail = { uid: fUid, workouts, loaded: true };
+    render();
+  } catch(e){
+    S.friendDetail = { uid: fUid, workouts: {}, loaded: true };
+    render();
+  }
+}
+
+function closeFriendDetail(){
+  S.friendDetail = null;
+  render();
+}
+
+/* ─── PULL TO REFRESH ────────────────────────────────────────────────────── */
+let _ptrStartY = 0, _ptrActive = false, _ptrTriggered = false;
+
+function _initPullToRefresh(){
+  const scroll = document.getElementById("main-scroll");
+  if(!scroll || scroll._ptrInit) return;
+  scroll._ptrInit = true;
+
+  scroll.addEventListener("touchstart", e=>{
+    if(scroll.scrollTop === 0){
+      _ptrStartY = e.touches[0].clientY;
+      _ptrActive = true;
+      _ptrTriggered = false;
+    }
+  }, { passive: true });
+
+  scroll.addEventListener("touchmove", e=>{
+    if(!_ptrActive) return;
+    const dy = e.touches[0].clientY - _ptrStartY;
+    if(dy > 60 && !_ptrTriggered && scroll.scrollTop === 0){
+      _ptrTriggered = true;
+      const ind = document.getElementById("ptr-indicator");
+      if(ind){ ind.classList.add("visible"); }
+      const txt = document.getElementById("ptr-text");
+      if(txt) txt.textContent = "Uvoľnite pre obnovenie...";
+    }
+  }, { passive: true });
+
+  scroll.addEventListener("touchend", async ()=>{
+    if(!_ptrActive) return;
+    _ptrActive = false;
+    if(!_ptrTriggered) return;
+    _ptrTriggered = false;
+    const ind = document.getElementById("ptr-indicator");
+    const txt = document.getElementById("ptr-text");
+    if(txt) txt.textContent = "Načítavam...";
+    // Refresh current view
+    if(S.view === "week"){
+      await reloadWeek();
+    } else if(S.view === "history" || S.view === "stats"){
+      S.allLoaded = false;
+      await loadAll();
+    }
+    if(ind){ ind.classList.remove("visible"); }
+  });
+}
+
+/* ─── BOOT ───────────────────────────────────────────────────────────────── */
+if (location.protocol === "file:") {
+  document.addEventListener("DOMContentLoaded", () => {
+    document.getElementById("app").innerHTML = `
+    <div class="fullscreen" style="padding:32px;text-align:left;max-width:480px;margin:0 auto;align-items:flex-start;justify-content:flex-start;padding-top:56px">
+      <div style="font-family:var(--fd);font-size:36px;letter-spacing:4px;color:var(--acc);margin-bottom:4px">IRONLOG</div>
+      <div style="font-family:var(--fm);font-size:10px;color:var(--red);margin-bottom:24px;text-transform:uppercase;letter-spacing:2px">needs hosting — nefunguje ako lokalny subor</div>
+      <div style="font-family:var(--fm);font-size:13px;color:var(--text);line-height:2.2;border:1px solid var(--border2);padding:18px;background:var(--s1)">
+        <div style="color:var(--acc);font-family:var(--fd);font-size:18px;letter-spacing:1px;margin-bottom:10px">POSTUP — 60 sekund:</div>
+        <span style="color:var(--acc)">1.</span> Otvor <strong>app.netlify.com/drop</strong><br>
+        <span style="color:var(--acc)">2.</span> Presun tento subor do okna<br>
+        <span style="color:var(--acc)">3.</span> Skopiruj URL (napr. abc-123.netlify.app)<br>
+        <span style="color:var(--acc)">4.</span> Firebase Console &rarr; Authentication &rarr; Settings &rarr; Authorized domains &rarr; Add domain &rarr; vloz URL<br>
+        <span style="color:var(--acc)">5.</span> Otvor URL v prehliadaci &#10003;
+      </div>
+      <div style="margin-top:14px;font-size:11px;color:var(--mut);font-family:var(--fm);line-height:1.9">
+        Firebase Auth vyzaduje https:// alebo http://<br>
+        Lokalny subor (file://) nie je podporovany.
+      </div>
+    </div>`;
+  });
+} else {
+  setTimeout(renderNow, 100);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   SHOW CONFIG HELPER if Firebase not configured
+══════════════════════════════════════════════════════════════════════════ */
+window.addEventListener("load", ()=>{
+  if(!FIREBASE_CONFIG.apiKey || FIREBASE_CONFIG.apiKey==="REPLACE_ME"){
+    document.getElementById("app").innerHTML=`
+    <div class="fullscreen" style="padding:28px;text-align:left;max-width:480px;margin:0 auto">
+      <div style="font-family:var(--fd);font-size:36px;letter-spacing:4px;color:var(--acc);margin-bottom:4px">IRONLOG</div>
+      <div style="font-family:var(--fm);font-size:10px;color:var(--sub);margin-bottom:28px;text-transform:uppercase;letter-spacing:2px">// setup required</div>
+      <div style="font-family:var(--fm);font-size:12px;color:var(--text);line-height:2;border:1px solid var(--border2);padding:16px;background:var(--s1)">
+        <span style="color:var(--acc)">1.</span> Otvor <strong>console.firebase.google.com</strong><br>
+        <span style="color:var(--acc)">2.</span> Vytvor nový projekt<br>
+        <span style="color:var(--acc)">3.</span> Authentication → Google → Zapni<br>
+        <span style="color:var(--acc)">4.</span> Firestore Database → Vytvoriť<br>
+        <span style="color:var(--acc)">5.</span> Project Settings → Web app → Config<br>
+        <span style="color:var(--acc)">6.</span> V tomto súbore nahraď <span style="color:var(--red)">REPLACE_ME</span> hodnotami<br>
+        <span style="color:var(--acc)">7.</span> Vlož Firestore Security Rules (v komentári v kóde)
+      </div>
+      <div style="margin-top:16px;font-size:11px;color:var(--sub);font-family:var(--fm);line-height:1.8">
+        Hosting: netlify.com/drop → presuň súbor<br>
+        Potom pridaj doménu: Firebase → Auth → Authorized domains
+      </div>
+    </div>`;
+  }
+});
+</script>
+</body>
+</html>
