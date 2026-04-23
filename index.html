@@ -346,6 +346,31 @@ input,textarea,select{font-family:inherit;font-size:16px;border-radius:0;-webkit
 .avatar-btn .avatar{pointer-events:none;}
 .avatar-btn .avatar-fallback{pointer-events:none;}
 
+/* ── MUSCLE TRACKER ─────────────────────────────────────────────────────── */
+.muscle-tracker{padding:14px 0 2px;background:var(--bg);}
+.muscle-tracker-title{font-size:9px;color:var(--sub);text-transform:uppercase;letter-spacing:2px;font-family:var(--fm);padding:0 18px 10px;}
+.muscle-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:1px;background:var(--border);}
+.muscle-card{background:var(--s1);padding:10px 14px 10px 12px;display:flex;align-items:center;gap:10px;position:relative;overflow:hidden;}
+.muscle-card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--card-color,var(--border2));}
+.muscle-card.warn::before{background:var(--red);}
+.muscle-card.ok::before{background:var(--acc);}
+.muscle-card.mid::before{background:#FFB74D;}
+.muscle-emoji{font-size:18px;flex-shrink:0;line-height:1;}
+.muscle-info{flex:1;min-width:0;}
+.muscle-name{font-size:11px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.muscle-meta{font-size:10px;color:var(--sub);font-family:var(--fm);margin-top:1px;}
+.muscle-right{text-align:right;flex-shrink:0;}
+.muscle-count{font-family:var(--fm);font-size:18px;font-weight:500;color:var(--text);}
+.muscle-count.ok{color:var(--acc);}
+.muscle-count.mid{color:#FFB74D;}
+.muscle-count.warn{color:var(--red);}
+.muscle-unit{font-size:8px;color:var(--mut);text-transform:uppercase;letter-spacing:1px;font-family:var(--fm);}
+.muscle-bar-wrap{height:2px;background:var(--border);margin-top:4px;border-radius:1px;overflow:hidden;}
+.muscle-bar-fill{height:100%;border-radius:1px;transition:width .4s ease;}
+.muscle-empty-note{padding:14px 18px 6px;font-size:11px;color:var(--mut);font-family:var(--fm);text-align:center;}
+.warn-banner{margin:10px 18px 4px;padding:9px 12px;background:var(--red-bg);border:1px solid rgba(255,68,68,.2);display:flex;align-items:center;gap:8px;}
+.warn-banner-txt{font-size:11px;color:var(--red);font-family:var(--fm);line-height:1.5;}
+
 /* ── MISC ─────────────────────────────────────────────────────────────── */
 .tag{display:inline-block;font-family:var(--fm);font-size:9px;padding:2px 7px;border:1px solid;letter-spacing:.5px;}
 .tag-green{color:var(--acc);border-color:var(--acc-br);}
@@ -1066,6 +1091,101 @@ function rSetup(){
   </div></div>`;
 }
 
+
+/* ─── MUSCLE GROUP TRACKER ───────────────────────────────────────────────── */
+// Reverse map: exercise name (lowercase) → short muscle group key
+const MUSCLE_GROUPS = {
+  "chest":    { label:"Hrudník",  emoji:"🫁", min:2 },
+  "back":     { label:"Chrbát",   emoji:"🔙", min:2 },
+  "shoulders":{ label:"Ramená",   emoji:"💪", min:2 },
+  "biceps":   { label:"Biceps",   emoji:"💪", min:2 },
+  "triceps":  { label:"Triceps",  emoji:"💪", min:2 },
+  "legs":     { label:"Nohy",     emoji:"🦵", min:2 },
+  "glutes":   { label:"Gluty",    emoji:"🍑", min:2 },
+  "core":     { label:"Core",     emoji:"🔥", min:2 },
+  "cardio":   { label:"Kardio",   emoji:"🏃", min:1 },
+};
+
+// Build exercise → group lookup from LIBRARY
+const EX_TO_GROUP = {};
+const _libMap = {
+  "🫁 Hrudník":"chest","🔙 Chrbát":"back","💪 Ramená":"shoulders",
+  "💪 Biceps":"biceps","💪 Triceps":"triceps","🦵 Nohy":"legs",
+  "🍑 Gluty":"glutes","🦵 Lýtka":"legs","🔥 Core":"core",
+  "🏃 Kardio":"cardio","🏋️ Celé telo":"back",
+};
+Object.entries(LIBRARY).forEach(([cat,exs])=>{
+  const grp = _libMap[cat];
+  if(grp) exs.forEach(n=>{ EX_TO_GROUP[n.toLowerCase()]=grp; });
+});
+
+function calcMuscleWeek(dateKeys){
+  // Returns { groupKey: { sessions, sets } }
+  const stats = {};
+  dateKeys.forEach(dk=>{
+    const dayExs = S.workouts[dk]||[];
+    const seenGroups = new Set();
+    dayExs.forEach(ex=>{
+      const grp = EX_TO_GROUP[ex.name.toLowerCase()];
+      if(!grp) return;
+      if(!stats[grp]) stats[grp] = { sessions:0, sets:0 };
+      if(!seenGroups.has(grp)){ stats[grp].sessions++; seenGroups.add(grp); }
+      stats[grp].sets += ex.sets.length;
+    });
+  });
+  return stats;
+}
+
+function rMuscleTracker(dateKeys){
+  const stats = calcMuscleWeek(dateKeys);
+  const hasAny = Object.keys(stats).length > 0;
+  if(!hasAny) return "";
+
+  // Find neglected groups (trained this week but below minimum)
+  const neglected = Object.entries(MUSCLE_GROUPS)
+    .filter(([k,g])=> stats[k] && stats[k].sessions > 0 && stats[k].sessions < g.min)
+    .map(([,g])=>g.label);
+
+  const maxSessions = Math.max(...Object.values(stats).map(s=>s.sessions), 1);
+
+  const cards = Object.entries(MUSCLE_GROUPS)
+    .filter(([k])=> stats[k] && stats[k].sessions > 0)
+    .sort(([,a],[,b])=>b.sessions-a.sessions)
+    .map(([k,g])=>{
+      const s = stats[k];
+      const ratio = s.sessions / g.min;
+      const statusClass = ratio >= 1 ? "ok" : ratio >= 0.5 ? "mid" : "warn";
+      const pct = Math.min(100, Math.round((s.sessions / Math.max(g.min, maxSessions)) * 100));
+      const barColor = ratio>=1?"var(--acc)":ratio>=0.5?"#FFB74D":"var(--red)";
+      return `
+        <div class="muscle-card ${statusClass}">
+          <div class="muscle-emoji">${g.emoji}</div>
+          <div class="muscle-info">
+            <div class="muscle-name">${g.label}</div>
+            <div class="muscle-bar-wrap">
+              <div class="muscle-bar-fill" style="width:${pct}%;background:${barColor}"></div>
+            </div>
+            <div class="muscle-meta">${s.sets} set${s.sets!==1?"ov":""}</div>
+          </div>
+          <div class="muscle-right">
+            <div class="muscle-count ${statusClass}">${s.sessions}</div>
+            <div class="muscle-unit">/ ${g.min}×</div>
+          </div>
+        </div>`;
+    }).join("");
+
+  const warnHtml = neglected.length
+    ? `<div class="warn-banner"><span style="font-size:16px">⚠️</span><div class="warn-banner-txt">Zanedbané partie: <strong>${neglected.join(", ")}</strong> — nedosiahol si odporúčané minimum.</div></div>`
+    : "";
+
+  return `
+  <div class="muscle-tracker">
+    <div class="muscle-tracker-title">Svalové partie tento týždeň</div>
+    ${warnHtml}
+    <div class="muscle-grid">${cards}</div>
+  </div>`;
+}
+
 function rWeek(){
   const mon=weekMon(S.weekOff), dates=weekDates(mon), today=todayKey();
   const sd = S.profile.split.days;
@@ -1102,7 +1222,9 @@ function rWeek(){
         </div>
       </div>`;
     }).join("")}
-  </div>`;
+  </div>
+  ${rMuscleTracker(wk)}
+  <div style="height:16px"></div>`;
 }
 
 function rHistory(){
